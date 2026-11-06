@@ -10,7 +10,7 @@
 import { DoubleSide, Ray, Vector3 } from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import type { Solids } from './geometry';
-import { type WindowGrid, type WindowSample, windowSample } from './geometry';
+import { TERRAIN_OWNER, type WindowGrid, type WindowSample, windowSample } from './geometry';
 import {
   type CivilDate,
   sunDirectionEnu,
@@ -33,6 +33,8 @@ export interface DaySpec {
 export const LIT = -1;
 /** 采样结果：太阳在地平线下，或在墙的背面 */
 export const AWAY = -2;
+/** 采样结果：被山体（地形）挡住 */
+export const TERRAIN = -3;
 
 export interface TraceOptions {
   coarseStep: number;
@@ -95,7 +97,7 @@ export class SunlightEngine {
     this.maxHeight = solids.geometry.boundingBox?.max.z ?? 0;
   }
 
-  /** 太阳方向 dir 下，采样点 s 是否被直射；返回 LIT、AWAY，或挡光建筑的下标 */
+  /** 太阳方向 dir 下，采样点 s 是否被直射；返回 LIT、AWAY、TERRAIN，或挡光建筑的下标 */
   probe(s: WindowSample, dir: readonly [number, number, number]): number {
     const [de, dn, du] = dir;
     if (du <= 0 || s.nx * de + s.ny * dn <= 0) return AWAY;
@@ -106,7 +108,30 @@ export class SunlightEngine {
     this.ray.direction.set(de, dn, du);
     const hit = this.bvh.raycastFirst(this.ray, DoubleSide, 0, far);
     if (!hit?.face) return LIT;
-    return this.vertexBuilding[hit.face.a] ?? LIT;
+    const owner = this.vertexBuilding[hit.face.a];
+    if (owner === undefined) return LIT;
+    return owner === TERRAIN_OWNER ? TERRAIN : owner;
+  }
+
+  /**
+   * 任意方向的射线求交：返回最近命中的距离与归属（建筑下标，或 TERRAIN），没打中返回 null。
+   * 视野分析复用同一棵 BVH。
+   */
+  firstHit(
+    px: number,
+    py: number,
+    pz: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    far: number,
+  ): { distance: number; owner: number } | null {
+    this.ray.origin.set(px, py, pz);
+    this.ray.direction.set(dx, dy, dz).normalize();
+    const hit = this.bvh.raycastFirst(this.ray, DoubleSide, 0, far);
+    if (!hit?.face) return null;
+    const owner = this.vertexBuilding[hit.face.a];
+    return { distance: hit.distance, owner: owner === TERRAIN_OWNER ? TERRAIN : (owner ?? -1) };
   }
 
   /**

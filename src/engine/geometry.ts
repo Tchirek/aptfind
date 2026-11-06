@@ -1,9 +1,9 @@
 /**
- * 建筑几何：挤出成实体（供射线求交与渲染），以及在外墙上划分逐窗采样网格。
+ * 建筑与地形几何：挤出成实体（供射线求交与渲染），以及在外墙上划分逐窗采样网格。
  */
 
 import { BufferAttribute, BufferGeometry, ShapeUtils, Vector2 } from 'three';
-import type { Building } from './district';
+import type { Building, Terrain } from './district';
 
 /** 窗台高度：GB 50180 规定日照计算起点为底层窗台面，逐层同理取各层窗台 */
 export const SILL_HEIGHT = 0.9;
@@ -15,6 +15,8 @@ export const MIN_WALL_LENGTH = 1.5;
 const SAMPLE_OFFSET = 0.05;
 /** 住宅层高按 3 m 估算；实地核验的楼高也按"层数 × 3 m"存放，两者一致 */
 export const FLOOR_HEIGHT = 3;
+/** 地形三角形在 vertexBuilding 里的归属标记 */
+export const TERRAIN_OWNER = 0xffffffff;
 
 export const floorsOf = (height: number) => Math.max(1, Math.round(height / FLOOR_HEIGHT));
 
@@ -24,7 +26,7 @@ export const defaultHeight: HeightOf = (b) => b.height;
 
 export interface Solids {
   geometry: BufferGeometry;
-  /** 每个顶点所属建筑的下标，用来从射线命中点反查是哪栋楼挡住的 */
+  /** 每个顶点所属建筑的下标（地形为 TERRAIN_OWNER），用来从射线命中点反查是谁挡住的 */
   vertexBuilding: Uint32Array;
 }
 
@@ -34,10 +36,30 @@ function ringPoints(ring: Float64Array): Vector2[] {
   return pts;
 }
 
-/** 把建筑挤出成非索引三角网格（ENU 坐标，z 向上）：外墙、内院墙与平屋顶 */
+/** 地形网格的三角形（ENU，z 向上），每格两个三角形，从上往下看逆时针 */
+export function terrainTriangles(t: Terrain, out: number[] = []): number[] {
+  const z = (i: number, j: number) => t.z[j * t.nx + i] as number;
+  for (let j = 0; j < t.ny - 1; j++) {
+    for (let i = 0; i < t.nx - 1; i++) {
+      const x0 = t.x0 + i * t.step;
+      const y0 = t.y0 + j * t.step;
+      const x1 = x0 + t.step;
+      const y1 = y0 + t.step;
+      out.push(x0, y0, z(i, j), x1, y0, z(i + 1, j), x1, y1, z(i + 1, j + 1));
+      out.push(x0, y0, z(i, j), x1, y1, z(i + 1, j + 1), x0, y1, z(i, j + 1));
+    }
+  }
+  return out;
+}
+
+/**
+ * 把建筑挤出成非索引三角网格（ENU，z 向上）：外墙、内院墙与平屋顶，墙从基底高程起算。
+ * 传入 terrain 时把地形也并进来，作为遮挡物参与射线求交。
+ */
 export function buildSolids(
   buildings: readonly Building[],
   heightOf: HeightOf = defaultHeight,
+  terrain?: Terrain,
 ): Solids {
   const pos: number[] = [];
   const owner: number[] = [];
@@ -46,6 +68,8 @@ export function buildSolids(
     const h = heightOf(b);
     if (h <= 0) continue;
     const before = pos.length;
+    const z0 = b.base;
+    const z1 = b.base + h;
 
     for (const ring of b.rings) {
       const n = ring.length / 2;
@@ -56,8 +80,8 @@ export function buildSolids(
         const bx = ring[2 * j] as number;
         const by = ring[2 * j + 1] as number;
         // 外墙向外（外轮廓逆时针、内院顺时针时，实体都在边的左侧）
-        pos.push(ax, ay, 0, bx, by, 0, bx, by, h);
-        pos.push(ax, ay, 0, bx, by, h, ax, ay, h);
+        pos.push(ax, ay, z0, bx, by, z0, bx, by, z1);
+        pos.push(ax, ay, z0, bx, by, z1, ax, ay, z1);
       }
     }
 
@@ -71,11 +95,17 @@ export function buildSolids(
         // 保证屋顶三角形从上往下看是逆时针，法线朝上
         const ccw = (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x) > 0;
         const [s, t] = ccw ? [q, r] : [r, q];
-        pos.push(p.x, p.y, h, s.x, s.y, h, t.x, t.y, h);
+        pos.push(p.x, p.y, z1, s.x, s.y, z1, t.x, t.y, z1);
       }
     }
 
     for (let k = before; k < pos.length; k += 3) owner.push(b.index);
+  }
+
+  if (terrain) {
+    const before = pos.length;
+    terrainTriangles(terrain, pos);
+    for (let k = before; k < pos.length; k += 3) owner.push(TERRAIN_OWNER);
   }
 
   const geometry = new BufferGeometry();
@@ -87,6 +117,7 @@ export function buildSolids(
 /**
  * 外墙上的逐窗网格，按"结构数组"存放以便在 Worker 之间零拷贝传递。
  * 第 i 个窗位是墙段 (x0,y0)→(x1,y1) 上、z0 到 z1 之间的一格。
+ * 同一面墙的窗位连续存放：下标 = wallStart[w] + 开间 × wallFloors[w] + 层。
  */
 export interface WindowGrid {
   count: number;
@@ -98,6 +129,10 @@ export interface WindowGrid {
   z1: Float32Array;
   building: Uint32Array;
   floor: Uint16Array;
+  wall: Uint32Array;
+  wallStart: Uint32Array;
+  wallBays: Uint16Array;
+  wallFloors: Uint16Array;
 }
 
 /** 墙段外法线的方位角（正北 0°，顺时针） */
@@ -147,6 +182,10 @@ export function buildWindowGrid(
   const z1: number[] = [];
   const building: number[] = [];
   const floor: number[] = [];
+  const wall: number[] = [];
+  const wallStart: number[] = [];
+  const wallBays: number[] = [];
+  const wallFloors: number[] = [];
 
   for (const b of buildings) {
     if (!include(b)) continue;
@@ -166,6 +205,10 @@ export function buildWindowGrid(
         const len = Math.hypot(bx - ax, by - ay);
         if (len < MIN_WALL_LENGTH) continue;
         const bays = Math.max(1, Math.round(len / BAY_WIDTH));
+        const w = wallStart.length;
+        wallStart.push(building.length);
+        wallBays.push(bays);
+        wallFloors.push(floors);
         for (let k = 0; k < bays; k++) {
           const t0 = k / bays;
           const t1 = (k + 1) / bays;
@@ -174,10 +217,11 @@ export function buildWindowGrid(
             y0.push(ay + (by - ay) * t0);
             x1.push(ax + (bx - ax) * t1);
             y1.push(ay + (by - ay) * t1);
-            z0.push(f * fh);
-            z1.push((f + 1) * fh);
+            z0.push(b.base + f * fh);
+            z1.push(b.base + (f + 1) * fh);
             building.push(b.index);
             floor.push(f);
+            wall.push(w);
           }
         }
       }
@@ -194,6 +238,10 @@ export function buildWindowGrid(
     z1: Float32Array.from(z1),
     building: Uint32Array.from(building),
     floor: Uint16Array.from(floor),
+    wall: Uint32Array.from(wall),
+    wallStart: Uint32Array.from(wallStart),
+    wallBays: Uint16Array.from(wallBays),
+    wallFloors: Uint16Array.from(wallFloors),
   };
 }
 

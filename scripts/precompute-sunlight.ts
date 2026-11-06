@@ -19,7 +19,7 @@ const YEAR = 2027;
 export const QUARTER_MINUTE = 4;
 
 const district = decodeDistrict(JSON.parse(readFileSync(new URL('district.json', DATA), 'utf8')));
-const engine = new SunlightEngine(buildSolids(district.buildings));
+const engine = new SunlightEngine(buildSolids(district.buildings, undefined, district.terrain));
 const grid = buildWindowGrid(district.buildings);
 const date = utcToBeijingDate(solarTermUtc(YEAR, RULE_DAHAN.term));
 const path = new SunPath({

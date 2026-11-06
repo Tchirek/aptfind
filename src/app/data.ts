@@ -51,6 +51,9 @@ export const sceneData: Promise<SceneData> = load();
 /** 射线引擎在首次需要时构建（约 0.1 秒），供单个窗位的详细追踪使用 */
 let engine: SunlightEngine | null = null;
 export async function getEngine(): Promise<SunlightEngine> {
-  if (!engine) engine = new SunlightEngine(buildSolids((await sceneData).district.buildings));
+  if (!engine) {
+    const { district } = await sceneData;
+    engine = new SunlightEngine(buildSolids(district.buildings, undefined, district.terrain));
+  }
   return engine;
 }

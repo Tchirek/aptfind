@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Building } from './district';
+import type { Building, Terrain } from './district';
 import {
   buildSolids,
   buildWindowGrid,
@@ -9,7 +9,7 @@ import {
 } from './geometry';
 import { solarTermUtc, utcToBeijingDate } from './solar';
 import { RULE_DAHAN } from './standard';
-import { AWAY, LIT, type Span, SunlightEngine, SunPath } from './sunlight';
+import { AWAY, LIT, type Span, SunlightEngine, SunPath, TERRAIN } from './sunlight';
 
 const LAT = 30.616;
 const LON = 104.12;
@@ -30,9 +30,11 @@ function box(
     rings: [Float64Array.of(x0, y0, x1, y0, x1, y1, x0, y1)],
     height,
     floors: Math.round(height / 3),
+    base: 0,
     cls: 'R',
     source: 'cbmf',
     compound: -1,
+    label: null,
     core,
   };
 }
@@ -130,6 +132,35 @@ describe('南面一道长墙遮挡，对拍解析解', () => {
     expect(spans.some((sp) => sp.state === 1)).toBe(true);
     const lit = spans.filter((sp) => sp.state === LIT).reduce((a, sp) => a + sp.to - sp.from, 0);
     expect(lit).toBeCloseTo(minutes, 6);
+  });
+});
+
+describe('地形遮挡', () => {
+  // 南侧 30–40 m 处地面陡升 40 m，从底层窗台看山脊仰角约 52°，高于大寒正午太阳高度（约 39°）
+  const STEP = 10;
+  const nx = 41;
+  const ny = 21;
+  const z = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    const y = -100 + j * STEP;
+    for (let i = 0; i < nx; i++) z[j * nx + i] = y <= -40 ? 40 : 0;
+  }
+  const terrain: Terrain = { x0: -200, y0: -100, step: STEP, nx, ny, base: 0, z };
+  const buildings = [box(0, -10, 0, 10, 10, 9)];
+  const engine = new SunlightEngine(buildSolids(buildings, undefined, terrain));
+  const grid = buildWindowGrid(buildings);
+
+  it('底层南窗全天被山体挡住，遮挡记在地形名下', () => {
+    const spans: Span[] = [];
+    const minutes = engine.trace(grid, findWindow(grid, 0, 180, 0), path, undefined, spans);
+    expect(minutes).toBe(0);
+    expect(spans.some((sp) => sp.state === TERRAIN)).toBe(true);
+    for (const sp of spans) expect([TERRAIN, AWAY]).toContain(sp.state);
+  });
+
+  it('楼建在坡上时窗位随基底抬高', () => {
+    const lifted = buildWindowGrid([{ ...box(0, -10, 0, 10, 10, 9), base: 12 }]);
+    expect(lifted.z0[0]).toBe(12);
   });
 });
 
