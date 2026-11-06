@@ -53,6 +53,7 @@ SURVEY = ROOT / "pipeline" / "survey.csv"
 SURVEY_TODO = ROOT / "pipeline" / "survey_todo.csv"
 COMPOUND_INFO = ROOT / "pipeline" / "compound_info.csv"
 NAME_OVERRIDES = ROOT / "pipeline" / "names.csv"
+NAMES_TODO = ROOT / "pipeline" / "names_todo.csv"
 
 # 川师狮子山校区中心
 ORIGIN_LAT, ORIGIN_LON = 30.6160, 104.1200
@@ -708,6 +709,28 @@ def main() -> None:
             lon, lat = TO_WGS.transform(b["poly"].centroid.x, b["poly"].centroid.y)
             cname = compounds[b["compound"]]["name"] if b["compound"] is not None else ""
             w.writerow([b["id"], cname, f"{lat:.6f}", f"{lon:.6f}", f'{b["height"]:.1f}', b["floors"], ""])
+
+    # 校园里还没有名字的楼：按面积从大到小列出，方便在 names.csv 里手工补名
+    campus = {k for k, c in enumerate(compounds) if "师范大学" in c["name"] and "狮子山" in c["name"]}
+    campus |= {k for k, c in enumerate(compounds) if c.get("parent") in campus}
+    unnamed = sorted(
+        (b for b in buildings if b["compound"] in campus and not b["label"]), key=lambda b: -b["poly"].area
+    )
+    with NAMES_TODO.open("w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(["id", "area", "lat", "lon", "floors", "footprint_m2", "name"])
+        for b in unnamed:
+            lon, lat = TO_WGS.transform(b["poly"].centroid.x, b["poly"].centroid.y)
+            w.writerow([b["id"], compounds[b["compound"]]["name"], f"{lat:.6f}", f"{lon:.6f}", b["floors"], round(b["poly"].area), ""])
+
+    # 小区建成年代表：第一次运行时预填住宅小区的名字，之后不覆盖已填的内容
+    if not info:
+        res = sorted((c for c in compounds if c["kind"] == "residential"), key=lambda c: c["name"])
+        with COMPOUND_INFO.open("w", encoding="utf-8", newline="") as f:
+            w = csv.writer(f, lineterminator="\n")
+            w.writerow(["name", "built_year", "note"])
+            for c in res:
+                w.writerow([c["name"], "", ""])
 
     n_core = sum(b["core"] for b in buildings)
     named_core = sum(1 for b in buildings if b["core"] and b["compound"] is not None)

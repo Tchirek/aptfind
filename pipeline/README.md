@@ -39,7 +39,8 @@ VITE_AMAP_SECURITY_CODE=...
 2. `npm run dev`，打开 `/tools/amap.html`，在控制台依次执行 `await jgCollect.regeo()`、`await jgCollect.pois()`、`await jgCollect.campusNames()`；
 3. 结果落盘到 `pipeline/raw/amap/`，再运行一次 `build_district.py`。
 
-单栋楼的名称可以在 `names.csv` 里手工覆盖，小区建成年代填进 `compound_info.csv`。
+单栋楼的名称可以在 `names.csv` 里手工覆盖（`names_todo.csv` 按面积列出了校园里还没有名字的楼，带坐标与层数）；
+小区建成年代填进 `compound_info.csv`（首次运行时已预填全部住宅小区的名字）。
 
 脚本会打印 CBMF 与 OSM 建筑质心的偏移中位数，用来确认两套数据没有坐标系错位。
 当前数据：1430 栋匹配，偏移 dx 0.79 m、dy 2.36 m，没有 GCJ-02 那种上百米的偏移。
