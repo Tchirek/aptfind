@@ -1,15 +1,19 @@
-"""生成狮子山片区的场景数据 public/data/district.json。
+"""生成狮子山片区的场景数据 public/data/district.json（v2）。
 
 数据来源：
 - 建筑轮廓与高度：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），
-  高度来自 3D-GloBFP 遥感反演，高层普遍偏低，需实地校核（见 survey.csv）。
-- 道路、小区边界、水系：OpenStreetMap（ODbL），经 Overpass API 获取。
+  高度来自 3D-GloBFP 遥感反演，可用 survey.csv 的实地层数覆盖。
+- 地形：Copernicus DEM GLO-30，经去建筑处理（见 terrain.py）。
+- 道路、步行网、小区与校园边界、水系、地铁出入口：OpenStreetMap（ODbL），经 Overpass API 获取。
+- 地名（小区 AOI、校内建筑）与生活设施：高德开放平台，由 tools/amap.html 在本地采集。
 
 用法：
     python pipeline/build_district.py --cbmf <Sichuan.gdb 路径>
 
-坐标：以片区中心为原点的横轴墨卡托投影（米），x 指东、y 指北。原点处网格北与真北重合，
-片区范围内偏差小于 0.01°，可以直接拿太阳方位角计算。
+第一次运行会写出 pipeline/raw/amap/input-points.json（核心区每栋楼的坐标）；
+在开发服务器打开 /tools/amap.html 采集高德数据后再运行一次，地名与设施即补齐。
+
+坐标：以片区中心为原点的横轴墨卡托投影（米），x 指东、y 指北；高程 z 相对片区最低地面。
 """
 
 from __future__ import annotations
@@ -18,11 +22,13 @@ import argparse
 import csv
 import json
 import math
+import re
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,25 +36,35 @@ import numpy as np
 import pyogrio
 import shapely
 from pyproj import Transformer
-from shapely.geometry import LineString, MultiPolygon, Polygon
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 from shapely.ops import linemerge, polygonize
+from shapely.strtree import STRtree
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import amap  # noqa: E402
+import network  # noqa: E402
+import terrain  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "pipeline" / "raw"
+AMAP_RAW = RAW / "amap"
 OUT = ROOT / "public" / "data" / "district.json"
 SURVEY = ROOT / "pipeline" / "survey.csv"
 SURVEY_TODO = ROOT / "pipeline" / "survey_todo.csv"
+COMPOUND_INFO = ROOT / "pipeline" / "compound_info.csv"
+NAME_OVERRIDES = ROOT / "pipeline" / "names.csv"
 
 # 川师狮子山校区中心
 ORIGIN_LAT, ORIGIN_LON = 30.6160, 104.1200
 # 计算逐窗日照的核心区（约 2.0 km × 2.1 km）
 CORE = dict(south=30.6070, west=104.1090, north=30.6250, east=104.1310)
-# 核心区外再扩约 350 m，只作为遮挡物参与计算。
-# 大寒日真太阳时 8:00 太阳高度约 13°，40 m 高的楼影子能拖到 170 m 外
+# 核心区外再扩约 350 m，只作为遮挡物参与计算
 BUFFER_DEG = 0.0035
 
 FLOOR_HEIGHT = 3.0
-MIN_AREA = 12.0  # m²，更小的多为附属构筑物
+MIN_AREA = 40.0  # m²，更小的多为岗亭、棚架、配电房
+MIN_WIDTH = 3.5  # m，最小外接矩形短边，更窄的多为围墙、连廊被误识别成楼
+MAX_WATER_OVERLAP = 0.3
 SIMPLIFY = 0.25  # m
 
 CLASS_CODES = {
@@ -67,6 +83,10 @@ OVERPASS_ENDPOINTS = [
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
 
+LOCAL_PROJ = f"+proj=tmerc +lat_0={ORIGIN_LAT} +lon_0={ORIGIN_LON} +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +units=m"
+TO_LOCAL = Transformer.from_crs("EPSG:4326", LOCAL_PROJ, always_xy=True)
+TO_WGS = Transformer.from_crs(LOCAL_PROJ, "EPSG:4326", always_xy=True)
+
 
 @dataclass
 class Bounds:
@@ -83,71 +103,91 @@ class Bounds:
         return f"{self.south},{self.west},{self.north},{self.east}"
 
 
-LOCAL_PROJ = f"+proj=tmerc +lat_0={ORIGIN_LAT} +lon_0={ORIGIN_LON} +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +units=m"
-TO_LOCAL = Transformer.from_crs("EPSG:4326", LOCAL_PROJ, always_xy=True)
-
-
 def to_local(geom):
     return shapely.transform(geom, lambda xy: np.column_stack(TO_LOCAL.transform(xy[:, 0], xy[:, 1])))
 
 
+def xy_local(lon, lat):
+    x, y = TO_LOCAL.transform(lon, lat)
+    return np.asarray(x), np.asarray(y)
+
+
+def dm(v: float) -> int:
+    return round(v * 10)
+
+
 def ring_dm(coords) -> list[int]:
-    """环坐标转成分米整数并展平，去掉闭合点。"""
-    pts = list(coords)[:-1]
+    """环坐标转成分米整数并展平，去掉闭合点"""
     out: list[int] = []
-    for x, y in pts:
-        out += [round(x * 10), round(y * 10)]
+    for x, y in list(coords)[:-1]:
+        out += [dm(x), dm(y)]
     return out
 
 
 def line_dm(coords) -> list[int]:
     out: list[int] = []
     for x, y in coords:
-        out += [round(x * 10), round(y * 10)]
+        out += [dm(x), dm(y)]
     return out
 
 
 # ---------------------------------------------------------------- OSM
 
 
-def fetch_osm(bounds: Bounds) -> dict:
-    cache = RAW / "osm.json"
+def overpass(query: str, cache: Path) -> dict:
     if cache.exists():
         return json.loads(cache.read_text(encoding="utf-8"))
-    b = bounds.overpass
-    query = f"""
-[out:json][timeout:180];
-(
-  way["highway"]({b});
-  way["landuse"="residential"]({b});
-  relation["landuse"="residential"]({b});
-  way["amenity"~"^(university|college|school)$"]({b});
-  way["waterway"~"^(river|canal|stream)$"]({b});
-  way["natural"="water"]({b});
-  relation["natural"="water"]({b});
-  way["building"]({b});
-);
-out geom tags;
-"""
     body = urllib.parse.urlencode({"data": query}).encode()
-    data = None
     for attempt in range(3):
         for endpoint in OVERPASS_ENDPOINTS:
-            req = urllib.request.Request(endpoint, data=body, headers={"User-Agent": "jianguang-pipeline/0.1"})
+            req = urllib.request.Request(endpoint, data=body, headers={"User-Agent": "jianguang-pipeline/0.2"})
             try:
                 with urllib.request.urlopen(req, timeout=240) as resp:
                     data = json.load(resp)
-                break
+                RAW.mkdir(parents=True, exist_ok=True)
+                cache.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+                return data
             except (urllib.error.URLError, TimeoutError) as e:
                 print(f"Overpass {endpoint} 失败（第 {attempt + 1} 轮）：{e}", file=sys.stderr)
-        if data is not None:
-            break
         time.sleep(20 * (attempt + 1))
-    if data is None:
-        raise SystemExit("Overpass 全部失败，稍后再试")
-    RAW.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    return data
+    raise SystemExit("Overpass 全部失败，稍后再试")
+
+
+def fetch_osm(b: Bounds) -> dict:
+    q = b.overpass
+    return overpass(
+        f"""
+[out:json][timeout:180];
+(
+  way["highway"]({q});
+  way["landuse"="residential"]({q});
+  relation["landuse"="residential"]({q});
+  way["amenity"~"^(university|college|school)$"]({q});
+  way["waterway"~"^(river|canal|stream)$"]({q});
+  way["natural"="water"]({q});
+  relation["natural"="water"]({q});
+  way["building"]({q});
+);
+out geom tags;
+""",
+        RAW / "osm.json",
+    )
+
+
+def fetch_osm_metro(b: Bounds) -> dict:
+    q = b.expand(0.004).overpass
+    return overpass(
+        f"""
+[out:json][timeout:120];
+(
+  node["railway"="subway_entrance"]({q});
+  node["station"="subway"]({q});
+  node["railway"="station"]["subway"="yes"]({q});
+);
+out body;
+""",
+        RAW / "osm-metro.json",
+    )
 
 
 def way_coords(el: dict) -> list[tuple[float, float]]:
@@ -155,7 +195,7 @@ def way_coords(el: dict) -> list[tuple[float, float]]:
 
 
 def area_geometry(el: dict) -> Polygon | MultiPolygon | None:
-    """把 OSM 的闭合 way 或 multipolygon relation 转成多边形（经纬度）。"""
+    """把 OSM 的闭合 way 或 multipolygon relation 转成多边形（经纬度）"""
     if el["type"] == "way":
         c = way_coords(el)
         if len(c) >= 4 and c[0] == c[-1]:
@@ -174,41 +214,108 @@ def area_geometry(el: dict) -> Polygon | MultiPolygon | None:
     return geom
 
 
+def explode_polygons(geom) -> list[Polygon]:
+    if geom is None or geom.is_empty:
+        return []
+    if isinstance(geom, Polygon):
+        return [geom]
+    return [g for g in getattr(geom, "geoms", []) if isinstance(g, Polygon)]
+
+
 ROAD_CLASSES = {
     "motorway": 0, "trunk": 0, "primary": 1, "secondary": 2, "tertiary": 3,
     "motorway_link": 2, "trunk_link": 2, "primary_link": 2, "secondary_link": 3, "tertiary_link": 3,
-    "residential": 4, "unclassified": 4, "living_street": 4, "service": 5,
+    "residential": 4, "unclassified": 4, "living_street": 4, "service": 5, "pedestrian": 5,
 }
+
+
+def is_open_water(tags: dict) -> bool:
+    """暗渠（tunnel=culvert）、地下河段（layer<0）、加盖的（covered=yes）都不画成水面"""
+    if tags.get("tunnel") or tags.get("covered") == "yes":
+        return False
+    try:
+        return int(tags.get("layer", "0")) >= 0
+    except ValueError:
+        return True
 
 
 # ---------------------------------------------------------------- CBMF
 
 
-def load_cbmf(gdb: Path, bounds: Bounds) -> list[dict]:
-    meta, _, geoms, fields = pyogrio.raw.read(gdb, bbox=(bounds.west, bounds.south, bounds.east, bounds.north))
-    names = list(meta["fields"])
-    cols = {n: fields[i] for i, n in enumerate(names)}
+def load_cbmf(gdb: Path, b: Bounds) -> list[dict]:
+    meta, _, geoms, fields = pyogrio.raw.read(gdb, bbox=(b.west, b.south, b.east, b.north))
+    cols = {n: fields[i] for i, n in enumerate(meta["fields"])}
     return [
         {"geometry": shapely.from_wkb(g), "ID": cols["ID"][i], "Height": cols["Height"][i], "class_pred": cols["class_pred"][i]}
         for i, g in enumerate(geoms)
     ]
 
 
-def explode_polygons(geom) -> list[Polygon]:
-    if geom is None or geom.is_empty:
-        return []
-    if isinstance(geom, Polygon):
-        return [geom]
-    if isinstance(geom, MultiPolygon):
-        return list(geom.geoms)
-    return [g for g in getattr(geom, "geoms", []) if isinstance(g, Polygon)]
+def min_width(p: Polygon) -> float:
+    r = shapely.minimum_rotated_rectangle(p)
+    xs, ys = r.exterior.coords.xy
+    sides = [math.hypot(xs[i + 1] - xs[i], ys[i + 1] - ys[i]) for i in range(2)]
+    return min(sides)
 
 
-def read_survey() -> dict[str, dict]:
-    if not SURVEY.exists():
+def read_csv(path: Path, key: str) -> dict[str, dict]:
+    if not path.exists():
         return {}
-    with SURVEY.open(encoding="utf-8") as f:
-        return {row["id"]: row for row in csv.DictReader(f) if row.get("id") and row.get("floors")}
+    with path.open(encoding="utf-8") as f:
+        return {row[key]: row for row in csv.DictReader(f) if row.get(key)}
+
+
+# ---------------------------------------------------------------- 地名
+
+
+HAN = re.compile(r"[一-鿿]")
+LABEL_SUFFIX = re.compile(r"(楼|馆|堂|中心|宿舍|公寓|食堂|栋|幢|座|苑|舍|学院|研究院|研究所|医院|体育场|运动场)$")
+LABEL_TYPES = ("学校内部设施", "楼宇", "宿舍", "图书馆", "体育馆", "科研机构", "博物馆", "展览馆", "礼堂")
+# 住宅小区是整片的名字，不是单栋楼的
+SKIP_TYPES = ("餐饮服务", "购物服务", "生活服务", "汽车", "金融保险", "交通设施", "公司企业", "住宿服务", "住宅区", "停车场")
+SCHOOL_AOI = ("1412",)
+RESIDENTIAL_AOI = ("1203",)
+
+
+def label_score(name: str, typ: str) -> int:
+    """单栋楼名称候选的优先级，0 表示不用"""
+    if not HAN.search(name) or "售楼" in name:
+        return 0
+    if any(t in typ for t in LABEL_TYPES):
+        return 3
+    if any(t in typ for t in SKIP_TYPES):
+        return 0
+    if LABEL_SUFFIX.search(name):
+        return 2
+    return 0
+
+
+def aoi_kind(typecode: str) -> str:
+    if typecode.startswith(SCHOOL_AOI):
+        return "school"
+    if typecode.startswith(RESIDENTIAL_AOI):
+        return "residential"
+    return "other"
+
+
+def norm_name(s: str) -> str:
+    return re.sub(r"[\s()（）·\-—]", "", s)
+
+
+def strip_compound(label: str, compound: str | None) -> str:
+    """'比华利国际城-3栋' 在'比华利国际城'里 → '3栋'"""
+    if compound:
+        for prefix in (compound, re.sub(r"[（(].*?[）)]", "", compound)):
+            if prefix and label.startswith(prefix):
+                rest = amap.balance_brackets(label[len(prefix) :])
+                return rest or label
+    return label
+
+
+def derived_boundary(polys: list[Polygon]) -> list[Polygon]:
+    """由同一小区的楼推算一个大致范围：外扩 14 m 合并，再收回 9 m，抹平楼间空隙"""
+    g = shapely.union_all([p.buffer(14, join_style="mitre") for p in polys]).buffer(-9, join_style="mitre")
+    return [p.simplify(2.0) for p in explode_polygons(g) if p.area > 400]
 
 
 # ---------------------------------------------------------------- main
@@ -218,104 +325,292 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cbmf", required=True, type=Path, help="CBMF 四川 Sichuan.gdb 目录")
     args = ap.parse_args()
-    # Windows 控制台默认 GBK，日志统一按 UTF-8 输出
     sys.stderr.reconfigure(encoding="utf-8")
 
     core = Bounds(**CORE)
     outer = core.expand(BUFFER_DEG)
     core_local = to_local(shapely.box(core.west, core.south, core.east, core.north))
+    outer_local = to_local(shapely.box(outer.west, outer.south, outer.east, outer.north))
 
-    osm = fetch_osm(outer)
-    elements = osm["elements"]
+    elements = fetch_osm(outer)["elements"]
+    metro_nodes = fetch_osm_metro(outer)["elements"]
 
-    # 小区边界：有名字的 landuse=residential，以及学校
-    compounds: list[dict] = []
+    # ---------------- 水系
+    water_polys: list[Polygon] = []
+    water_lines: list[tuple[LineString, float]] = []
     for el in elements:
         tags = el.get("tags", {})
-        name = tags.get("name")
+        if tags.get("natural") == "water" and is_open_water(tags):
+            water_polys += explode_polygons(to_local(area_geometry(el)) if area_geometry(el) is not None else None)
+        elif tags.get("waterway") in ("river", "canal", "stream") and el["type"] == "way" and is_open_water(tags):
+            try:
+                width = float(tags.get("width", ""))
+            except ValueError:
+                width = 8.0 if tags.get("waterway") == "river" else 2.5
+            water_lines.append((to_local(LineString(way_coords(el))), width))
+    water_union = shapely.union_all(water_polys) if water_polys else Polygon()
+
+    # ---------------- OSM 小区与校园
+    osm_compounds: list[dict] = []
+    unnamed_res: list[Polygon] = []
+    for el in elements:
+        tags = el.get("tags", {})
         is_res = tags.get("landuse") == "residential"
         is_school = tags.get("amenity") in ("university", "college", "school")
-        if not name or not (is_res or is_school):
+        if not (is_res or is_school):
             continue
         g = area_geometry(el)
-        if g is None or g.is_empty:
+        parts = [p for p in explode_polygons(to_local(g) if g is not None else None) if p.area >= 500]
+        if not parts:
             continue
-        g = to_local(g)
-        for p in explode_polygons(g):
-            if p.area < 500:
-                continue
-            compounds.append({"name": name, "kind": "school" if is_school else "residential", "geom": p.simplify(1.0)})
-    # 同名的多块合并成一个小区
-    merged: dict[str, dict] = {}
-    for c in compounds:
-        m = merged.setdefault(c["name"], {"name": c["name"], "kind": c["kind"], "parts": []})
-        m["parts"].append(c["geom"])
-    compound_list = sorted(merged.values(), key=lambda c: c["name"])
-    compound_tree = [(i, shapely.union_all(c["parts"])) for i, c in enumerate(compound_list)]
+        if tags.get("name"):
+            osm_compounds.append({"name": tags["name"], "kind": "school" if is_school else "residential", "parts": parts, "source": "osm"})
+        elif is_res:
+            unnamed_res += parts
 
-    # CBMF 建筑
+    # OSM 里有名字的建筑：用来给校内建筑等起名
+    osm_named: list[tuple[Polygon, str]] = []
+    for el in elements:
+        tags = el.get("tags", {})
+        if "building" in tags and HAN.search(tags.get("name", "")):
+            for p in explode_polygons(to_local(area_geometry(el)) if area_geometry(el) is not None else None):
+                osm_named.append((p, tags["name"]))
+
+    # ---------------- CBMF 建筑
     rows = load_cbmf(args.cbmf, outer)
-    survey = read_survey()
+    survey = read_csv(SURVEY, "id")
+    dropped: Counter = Counter()
     buildings: list[dict] = []
     for row in rows:
         for poly in explode_polygons(row["geometry"]):
             p = to_local(poly)
             if p.area < MIN_AREA:
+                dropped["面积过小"] += 1
                 continue
             p = shapely.geometry.polygon.orient(p.simplify(SIMPLIFY, preserve_topology=True), 1.0)
             if p.is_empty or not p.is_valid or p.area < MIN_AREA:
+                dropped["面积过小"] += 1
                 continue
-            bid = str(int(row["ID"]))
-            height = float(row["Height"])
-            src = "cbmf"
-            floors = max(1, round(height / FLOOR_HEIGHT))
-            if bid in survey:
-                floors = int(survey[bid]["floors"])
-                height = floors * FLOOR_HEIGHT
-                src = "survey"
-            c = p.centroid
-            compound = next((i for i, g in compound_tree if g.contains(c)), None)
+            if min_width(p) < MIN_WIDTH:
+                dropped["细长碎片"] += 1
+                continue
+            if not water_union.is_empty and p.intersects(water_union) and p.intersection(water_union).area / p.area > MAX_WATER_OVERLAP:
+                dropped["落在水面上"] += 1
+                continue
             buildings.append(
                 {
-                    "id": bid,
+                    "id": str(int(row["ID"])),
                     "poly": p,
-                    "height": height,
-                    "floors": floors,
+                    "height": float(row["Height"]),
                     "cls": CLASS_CODES.get(row["class_pred"], "U"),
-                    "src": src,
-                    "compound": compound,
-                    "core": bool(core_local.contains(c)),
+                    "src": "cbmf",
+                    "core": bool(core_local.contains(p.centroid)),
                 }
             )
 
-    # 同一 ID 被拆成多块时加后缀，保证唯一
     seen: dict[str, int] = {}
     for b in buildings:
         n = seen.get(b["id"], 0)
         seen[b["id"]] = n + 1
         if n:
             b["id"] = f'{b["id"]}-{n}'
+    for b in buildings:
+        if b["id"] in survey:
+            b["height"] = int(survey[b["id"]]["floors"]) * FLOOR_HEIGHT
+            b["src"] = "survey"
+        b["floors"] = max(1, round(b["height"] / FLOOR_HEIGHT))
 
-    # 与 OSM 建筑轮廓比对，检查两套数据有没有系统性偏移（例如 GCJ-02 加密偏移会到几百米）
-    osm_centroids = []
-    for el in elements:
-        if "building" in el.get("tags", {}) and el["type"] == "way":
-            g = area_geometry(el)
-            if g is not None and not g.is_empty:
-                osm_centroids.append(to_local(g).centroid)
-    cb_xy = np.array([[b["poly"].centroid.x, b["poly"].centroid.y] for b in buildings])
-    offsets = []
-    for c in osm_centroids:
-        d = cb_xy - np.array([c.x, c.y])
-        i = int(np.argmin(np.hypot(d[:, 0], d[:, 1])))
-        if math.hypot(*d[i]) < 30:
-            offsets.append(d[i])
-    offsets = np.array(offsets)
-    med = np.median(offsets, axis=0) if len(offsets) else np.array([np.nan, np.nan])
-    print(f"OSM 建筑 {len(osm_centroids)} 栋，30 m 内匹配到 CBMF {len(offsets)} 栋，"
-          f"质心偏移中位数 dx={med[0]:.2f} m dy={med[1]:.2f} m", file=sys.stderr)
+    # ---------------- 地形
+    terrain_cache = RAW / "terrain.npz"
+    if terrain_cache.exists():
+        t = np.load(terrain_cache)
+        grid = terrain.TerrainGrid(float(t["x0"]), float(t["y0"]), float(t["step"]), t["z"], float(t["base"]))
+    else:
+        polys_wgs = [p for r in rows for p in explode_polygons(r["geometry"])]
+        grid, diag = terrain.build_terrain((outer.west, outer.south, outer.east, outer.north), polys_wgs, xy_local)
+        np.savez(terrain_cache, x0=grid.x0, y0=grid.y0, step=grid.step, z=grid.z, base=grid.base)
+        print(f"地形：{json.dumps(diag, ensure_ascii=False)}", file=sys.stderr)
+    for b in buildings:
+        xs, ys = b["poly"].exterior.coords.xy
+        # 坡地上的楼以最低处为基底，上坡一侧的墙埋进地形里
+        b["base"] = float(grid.sample(np.asarray(xs), np.asarray(ys)).min())
 
-    # 道路
+    # ---------------- 地名
+    regeo = amap.load_regeo(AMAP_RAW)
+    places = amap.load_named_places(AMAP_RAW)
+    overrides = read_csv(NAME_OVERRIDES, "id")
+
+    tree = STRtree([b["poly"] for b in buildings])
+
+    def containing(pt: Point, tol: float = 2.0) -> list[int]:
+        return [int(i) for i in tree.query(pt.buffer(tol), predicate="intersects")]
+
+    labels: dict[int, tuple[int, str]] = {}
+
+    def offer(i: int, score: int, name: str) -> None:
+        if "售楼" in name:
+            return
+        if score and name and (i not in labels or score > labels[i][0]):
+            labels[i] = (score, name)
+
+    for poly, name in osm_named:
+        for i in [int(i) for i in tree.query(poly, predicate="intersects")]:
+            inter = buildings[i]["poly"].intersection(poly).area
+            if inter > 0.5 * min(poly.area, buildings[i]["poly"].area):
+                offer(i, 4, amap.clean_campus_name(name))
+    polys = [b["poly"] for b in buildings]
+    for pl in places:
+        x, y = xy_local(pl.lon, pl.lat)
+        pt = Point(float(x), float(y))
+        score = label_score(pl.name, pl.type)
+        if not score:
+            continue
+        hits = containing(pt)
+        if not hits and score >= 3:
+            # 宿舍、校内设施的点常标在楼门口：12 m 内取最近的楼，分数降一档
+            i = int(tree.nearest(pt))
+            if polys[i].distance(pt) <= 12:
+                offer(i, score - 1, amap.clean_campus_name(pl.name))
+        for i in hits:
+            offer(i, score, amap.clean_campus_name(pl.name))
+
+    # 小区归属：先看 OSM 有名字的多边形（取最小的那个，附中在校园里时归附中）
+    comp_geoms = [(k, shapely.union_all(c["parts"])) for k, c in enumerate(osm_compounds)]
+    member: dict[int, int] = {}
+    for i, b in enumerate(buildings):
+        c = b["poly"].centroid
+        hits = [(g.area, k) for k, g in comp_geoms if g.contains(c)]
+        if hits:
+            member[i] = min(hits)[1]
+
+    def aoi_of(b: dict) -> tuple[str, str, float] | None:
+        """(名称, 类型码, 面积 m²)"""
+        r = regeo.get(b["id"])
+        if not r:
+            return None
+        for a in r.get("aois", []):
+            name = amap.text(a.get("name"))
+            if name:
+                try:
+                    area = float(a.get("area") or 0)
+                except (TypeError, ValueError):
+                    area = 0.0
+                return name, amap.text(a.get("type")), area
+        if "住宅" in amap.text(r.get("neighborhoodType")) and amap.text(r.get("neighborhood")):
+            return amap.text(r["neighborhood"]), "120302", 0.0
+        return None
+
+    aoi_info = {i: aoi_of(b) for i, b in enumerate(buildings)}
+    aoi = {i: (v[0] if v else None) for i, v in aoi_info.items()}
+    aoi_kinds = {v[0]: aoi_kind(v[1]) for v in aoi_info.values() if v}
+
+    # 落在 OSM 大地块（如校园）里的 AOI：
+    # - 住宅类（桂苑、务实苑）是子片区，比校园本身更具体，改归 AOI；
+    # - 其他小 AOI（第一教学楼、图书馆）其实是单栋楼的名字，楼仍归校园。
+    for i, v in aoi_info.items():
+        if not v or i not in member:
+            continue
+        k = member[i]
+        if norm_name(v[0]) == norm_name(osm_compounds[k]["name"]):
+            continue
+        area_osm = comp_geoms[k][1].area
+        if v[1].startswith(RESIDENTIAL_AOI) and v[2] < 0.5 * area_osm:
+            del member[i]
+        elif not v[1].startswith(RESIDENTIAL_AOI) and v[2] < 0.25 * area_osm:
+            offer(i, 5, amap.clean_campus_name(v[0]))
+            aoi[i] = None
+
+    # 没名字的 OSM 住宅用地：按楼里多数高德 AOI 命名
+    for poly in unnamed_res:
+        inside = [i for i in tree.query(poly, predicate="intersects") if i not in member and poly.contains(buildings[i]["poly"].centroid)]
+        names = Counter(aoi[i] for i in inside if aoi[i])
+        if names:
+            name, n = names.most_common(1)[0]
+            if n >= 0.5 * len(inside):
+                osm_compounds.append({"name": name, "kind": aoi_kinds.get(name, "residential"), "parts": [poly], "source": "osm"})
+                k = len(osm_compounds) - 1
+                for i in inside:
+                    member[int(i)] = k
+
+    # 其余按高德 AOI 分组，范围由楼推算
+    by_name = {norm_name(c["name"]): k for k, c in enumerate(osm_compounds)}
+    groups: dict[str, list[int]] = defaultdict(list)
+    for i, name in aoi.items():
+        if i in member or not name:
+            continue
+        k = by_name.get(norm_name(name))
+        if k is not None:
+            member[i] = k
+        else:
+            groups[name].append(i)
+    n_osm = len(osm_compounds)
+    for name, idx in groups.items():
+        parts = derived_boundary([buildings[i]["poly"] for i in idx])
+        if not parts:
+            continue
+        center = shapely.union_all(parts).representative_point()
+        parent = min(((g.area, k) for k, g in comp_geoms[:n_osm] if g.contains(center)), default=(0, None))[1]
+        if parent is not None:
+            name = amap.clean_campus_name(name)
+        osm_compounds.append(
+            {"name": name, "kind": aoi_kinds.get(name, aoi_kinds.get(next(iter([n for n in aoi_kinds if n.endswith(name)]), ""), "residential")),
+             "parts": parts, "source": "derived", "parent": parent}
+        )
+        k = len(osm_compounds) - 1
+        for i in idx:
+            member[i] = k
+
+    # 合并同名
+    merged: dict[str, dict] = {}
+    remap: dict[int, int] = {}
+    order: list[dict] = []
+    for k, c in enumerate(osm_compounds):
+        key = norm_name(c["name"])
+        if key in merged:
+            m = merged[key]
+            m["parts"] += c["parts"]
+            if c["source"] == "osm":
+                m["source"] = "osm"
+        else:
+            m = {**c, "parts": list(c["parts"])}
+            merged[key] = m
+            order.append(m)
+        remap[k] = order.index(m)
+    compounds = order
+    for c in compounds:
+        if c.get("parent") is not None:
+            c["parent"] = remap[c["parent"]]
+    info = read_csv(COMPOUND_INFO, "name")
+
+    for i, b in enumerate(buildings):
+        b["compound"] = remap[member[i]] if i in member else None
+        label = overrides.get(b["id"], {}).get("name") or (labels[i][1] if i in labels else None)
+        if label:
+            cname = compounds[b["compound"]]["name"] if b["compound"] is not None else None
+            label = strip_compound(label, cname)
+            if cname and norm_name(label) == norm_name(cname):
+                label = None
+        b["label"] = label
+
+    # ---------------- 设施
+    pois: list[dict] = []
+    for p in amap.load_pois(AMAP_RAW):
+        x, y = xy_local(p.lon, p.lat)
+        if outer_local.contains(Point(float(x), float(y))):
+            pois.append({"n": p.name, "c": p.category, "p": [dm(float(x)), dm(float(y))]})
+    has_amap_metro = any(p["c"] == "metro" for p in pois)
+    if not has_amap_metro:
+        for el in metro_nodes:
+            tags = el.get("tags", {})
+            x, y = xy_local(el["lon"], el["lat"])
+            name = tags.get("name") or (f'{tags["ref"]}口' if tags.get("ref") else "地铁出入口")
+            pois.append({"n": name, "c": "metro", "p": [dm(float(x)), dm(float(y))]})
+
+    # ---------------- 步行网
+    minx, miny, maxx, maxy = outer_local.bounds
+    net = network.build_network(elements, xy_local, (minx - 400, miny - 400, maxx + 400, maxy + 400))
+
+    # ---------------- 道路
     roads = []
     for el in elements:
         tags = el.get("tags", {})
@@ -323,73 +618,108 @@ def main() -> None:
         if el["type"] != "way" or hw not in ROAD_CLASSES:
             continue
         line = to_local(LineString(way_coords(el)))
+        if not line.intersects(outer_local.buffer(200)):
+            continue
         roads.append({"n": tags.get("name"), "c": ROAD_CLASSES[hw], "b": 1 if tags.get("bridge") == "yes" else 0,
                       "p": line_dm(line.simplify(0.5).coords)})
 
-    # 水系
-    water = []
-    for el in elements:
-        tags = el.get("tags", {})
-        if tags.get("natural") == "water":
-            g = area_geometry(el)
-            for p in explode_polygons(to_local(g) if g is not None else None):
-                water.append({"r": ring_dm(p.simplify(1.0).exterior.coords)})
-        elif tags.get("waterway") in ("river", "canal", "stream") and el["type"] == "way":
-            line = to_local(LineString(way_coords(el)))
-            water.append({"l": line_dm(line.simplify(1.0).coords), "w": 30 if tags.get("waterway") == "river" else 6})
+    water = [{"r": ring_dm(p.simplify(1.0).exterior.coords)} for p in water_polys]
+    water += [{"l": line_dm(l.simplify(1.0).coords), "w": w} for l, w in water_lines if l.intersects(outer_local.buffer(200))]
+
+    attribution = [
+        "建筑：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），高度源自 3D-GloBFP",
+        terrain.ATTRIBUTION,
+        "道路、步行网、边界、水系：© OpenStreetMap contributors（ODbL）",
+    ]
+    if regeo or pois:
+        attribution.append(amap.ATTRIBUTION)
 
     out = {
-        "version": 1,
+        "version": 2,
         "origin": {"lat": ORIGIN_LAT, "lon": ORIGIN_LON},
         "projection": LOCAL_PROJ,
         "unit": "dm",
-        "core": [round(v * 10) for v in core_local.bounds],
+        "core": [dm(v) for v in core_local.bounds],
         "floorHeight": FLOOR_HEIGHT,
-        "attribution": [
-            "建筑轮廓与高度：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），高度源自 3D-GloBFP",
-            "道路、小区、水系：© OpenStreetMap contributors（ODbL）",
-        ],
+        "attribution": attribution,
+        "terrain": {
+            "x0": dm(grid.x0),
+            "y0": dm(grid.y0),
+            "step": dm(grid.step),
+            "nx": int(grid.z.shape[1]),
+            "ny": int(grid.z.shape[0]),
+            "base": grid.base,
+            "z": [dm(v) for v in grid.z.ravel()],
+        },
         "compounds": [
-            {"n": c["name"], "k": c["kind"],
-             "r": [ring_dm(p.exterior.coords) for p in c["parts"]]}
-            for c in compound_list
+            {
+                "n": c["name"],
+                "k": c["kind"],
+                "o": c["source"],
+                **({"p": c["parent"]} if c.get("parent") is not None else {}),
+                "r": [ring_dm(p.exterior.coords) for p in c["parts"]],
+                **({"y": int(info[c["name"]]["built_year"])} if info.get(c["name"], {}).get("built_year") else {}),
+            }
+            for c in compounds
         ],
         "buildings": [
             {
                 "id": b["id"],
                 "r": [ring_dm(b["poly"].exterior.coords)] + [ring_dm(i.coords) for i in b["poly"].interiors],
-                "h": round(b["height"] * 10),
+                "h": dm(b["height"]),
                 "f": b["floors"],
+                "z": dm(b["base"]),
                 "c": b["cls"],
                 "s": b["src"],
                 **({"k": b["compound"]} if b["compound"] is not None else {}),
+                **({"n": b["label"]} if b["label"] else {}),
                 **({"core": 1} if b["core"] else {}),
             }
             for b in buildings
         ],
         "roads": roads,
         "water": water,
+        "pois": pois,
+        "network": {
+            "n": [dm(v) for v in net["nodes"].ravel()],
+            "e": [int(v) for v in net["edges"].ravel()],
+            "s": [int(i) for i in np.nonzero(net["steps"])[0]],
+        },
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
-    # 待实地核验清单：核心区里最高的住宅楼，遥感最容易低估的那些
-    todo = sorted((b for b in buildings if b["core"] and b["cls"] == "R" and b["src"] == "cbmf"),
-                  key=lambda b: -b["height"])[:40]
-    to_wgs = Transformer.from_crs(LOCAL_PROJ, "EPSG:4326", always_xy=True)
+    # 高德采集的输入：核心区每栋楼的质心（WGS-84）
+    AMAP_RAW.mkdir(parents=True, exist_ok=True)
+    pts = []
+    for b in buildings:
+        if b["core"]:
+            c = b["poly"].representative_point()
+            lon, lat = TO_WGS.transform(c.x, c.y)
+            pts.append({"id": b["id"], "lon": round(lon, 7), "lat": round(lat, 7)})
+    (AMAP_RAW / "input-points.json").write_text(json.dumps(pts), encoding="utf-8")
+
+    # 待实地核验：核心区里最高的住宅楼
+    todo = sorted((b for b in buildings if b["core"] and b["cls"] == "R" and b["src"] == "cbmf"), key=lambda b: -b["height"])[:40]
     with SURVEY_TODO.open("w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(["id", "compound", "lat", "lon", "cbmf_height_m", "estimated_floors", "floors"])
         for b in todo:
-            lon, lat = to_wgs.transform(b["poly"].centroid.x, b["poly"].centroid.y)
-            w.writerow([b["id"], compound_list[b["compound"]]["name"] if b["compound"] is not None else "",
-                        f"{lat:.6f}", f"{lon:.6f}", f'{b["height"]:.1f}', b["floors"], ""])
+            lon, lat = TO_WGS.transform(b["poly"].centroid.x, b["poly"].centroid.y)
+            cname = compounds[b["compound"]]["name"] if b["compound"] is not None else ""
+            w.writerow([b["id"], cname, f"{lat:.6f}", f"{lon:.6f}", f'{b["height"]:.1f}', b["floors"], ""])
 
     n_core = sum(b["core"] for b in buildings)
-    n_comp = sum(b["compound"] is not None for b in buildings if b["core"])
-    print(f"建筑 {len(buildings)} 栋（核心区 {n_core} 栋，其中 {n_comp} 栋落在已命名小区内），"
-          f"小区 {len(compound_list)} 个，道路 {len(roads)} 条，水系 {len(water)} 处，"
-          f"实地核验 {sum(b['src'] == 'survey' for b in buildings)} 栋", file=sys.stderr)
+    named_core = sum(1 for b in buildings if b["core"] and b["compound"] is not None)
+    labelled = sum(1 for b in buildings if b["core"] and b["label"])
+    print(
+        f"建筑 {len(buildings)} 栋（核心区 {n_core}，归入小区/校园 {named_core}，有单栋名称 {labelled}）；"
+        f"剔除 {dict(dropped)}；小区与校园 {len(compounds)} 个（推算范围 {sum(c['source'] == 'derived' for c in compounds)}）；"
+        f"设施 {len(pois)}（{dict(Counter(p['c'] for p in pois))}）；步行网 {len(net['nodes'])} 节点 {len(net['edges'])} 边；"
+        f"水面 {len(water_polys)} 块、水道 {len(water_lines)} 条；地形 {grid.z.shape[1]}×{grid.z.shape[0]}，"
+        f"高差 {np.nanmax(grid.z):.1f} m",
+        file=sys.stderr,
+    )
     print(f"写出 {OUT.relative_to(ROOT)}（{OUT.stat().st_size / 1024:.0f} KB）", file=sys.stderr)
 
 
