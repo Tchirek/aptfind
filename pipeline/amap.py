@@ -70,6 +70,28 @@ class Poi:
 
 CATEGORY_FILES = ["metro", "bus", "grocery", "market", "food", "medical", "school", "park", "sport"]
 
+MEDICAL_NAME = re.compile(r"(医院|诊所|门诊|卫生|医疗中心|急救|药房|药店|大药)")
+
+
+def keep_poi(category: str, name: str, typ: str) -> bool:
+    """高德的大类里混着不相干的店，逐类收紧到居民日常会用到的那些"""
+    if category == "medical":
+        if any(t in typ for t in ("动物医疗", "整形美容", "医疗保健用品", "医药保健相关")):
+            return False
+        # "医疗保健服务场所"是泛类，里面有养生馆、保健品店
+        if "医疗保健服务场所" in typ and not MEDICAL_NAME.search(name):
+            return False
+        return True
+    if category == "grocery":
+        return any(t in typ for t in ("便民商店", "便利店", "超市", "超级市场"))
+    if category == "market":
+        return any(t in typ for t in ("农副产品市场", "蔬菜市场", "综合市场", "果品市场")) or bool(
+            re.search(r"(菜市场|农贸市场)", name)
+        )
+    if category == "sport":
+        return "台球" not in typ
+    return True
+
 
 def load_pois(raw: Path) -> list[Poi]:
     out: list[Poi] = []
@@ -79,7 +101,7 @@ def load_pois(raw: Path) -> list[Poi]:
         if not f.exists():
             continue
         for p in json.loads(f.read_text(encoding="utf-8")):
-            if p["id"] in seen:
+            if p["id"] in seen or not keep_poi(cat, p["name"], p.get("type", "")):
                 continue
             seen.add(p["id"])
             lon, lat = parse_location(p["location"])
