@@ -16,13 +16,12 @@ function placeName(data: SceneData, b: Building): string {
 
 function heightNote(b: Building): string {
   const floors = floorsOf(b.height);
-  if (b.source === 'survey') return `${floors} 层（实地核验）`;
-  if (b.source === 'user') return `${floors} 层（你改过）`;
-  return `${floors} 层，约 ${Math.round(b.height)} m（遥感反演，未核验，高层常偏低）`;
+  if (b.source === 'survey') return `${floors} 层 · 已核实`;
+  if (b.source === 'user') return `${floors} 层 · 已修改`;
+  return `${floors} 层 · 约 ${Math.round(b.height)} m`;
 }
 
-function Verdict({ minutes, isDahan }: { minutes: number; isDahan: boolean }) {
-  if (!isDahan) return <span className="verdict neutral">仅供参考，标准按大寒日判定</span>;
+function Verdict({ minutes }: { minutes: number }) {
   const ok = minutes >= THRESHOLD_MINUTES;
   return (
     <span className={`verdict ${ok ? 'good' : 'bad'}`}>
@@ -87,7 +86,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
         {result ? (
           <>
             <div className="big-number">{formatDuration(result.minutes)}</div>
-            <Verdict minutes={result.minutes} isDahan={day === '大寒'} />
+            {day === '大寒' && <Verdict minutes={result.minutes} />}
             <Timeline spans={result.spans} path={result.path} onFocus={setFocus} />
           </>
         ) : (
@@ -97,7 +96,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
 
       {blockers.length > 0 && (
         <section>
-          <div className="label">挡住阳光的楼</div>
+          <div className="label">遮挡来源</div>
           <ul className="blockers">
             {blockers.map((s) => {
               const ob = data.district.buildings[s.state] as Building;
@@ -118,7 +117,6 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
               );
             })}
           </ul>
-          <p className="hint">时刻为北京时间。指向一行，场景里会标出那栋楼。</p>
         </section>
       )}
 
@@ -145,7 +143,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
         <h2>{placeName(data, b)}</h2>
         <p className="sub">{heightNote(b)}</p>
       </header>
-      {count > 0 ? (
+      {count > 0 && (
         <section>
           <div className="label">大寒日不足 2 小时的窗位</div>
           <div className="big-number">
@@ -153,12 +151,8 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
             <small>%</small>
           </div>
           <p className="sub">
-            共 {count} 个窗位，{below} 个不足。点外墙上的格子看具体某一扇。
+            共 {count} 个窗位，{below} 个不足。
           </p>
-        </section>
-      ) : (
-        <section>
-          <p className="sub">这栋楼在核心区外，只作为遮挡物参与计算。</p>
         </section>
       )}
     </>

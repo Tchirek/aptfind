@@ -17,9 +17,6 @@ export function Legend() {
           </div>
         ))}
       </div>
-      <p className="legend-note">
-        <span className="tick-mark" />2 小时：GB 50180 大寒日日照标准
-      </p>
     </figure>
   );
 }
