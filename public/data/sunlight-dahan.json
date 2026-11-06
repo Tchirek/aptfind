@@ -1,0 +1,13 @@
+{
+  "rule": "dahan-2h",
+  "date": {
+    "year": 2027,
+    "month": 1,
+    "day": 20
+  },
+  "startTst": 480,
+  "endTst": 960,
+  "count": 237977,
+  "gridHash": 3732407239,
+  "unit": 0.25
+}
