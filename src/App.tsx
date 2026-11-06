@@ -1,4 +1,4 @@
-import { Component, type ReactNode, Suspense, use } from 'react';
+import { Component, type ReactNode, Suspense, use, useState } from 'react';
 import { sceneData } from './app/data';
 import { useApp } from './app/store';
 import { Scene } from './scene/Scene';
@@ -31,25 +31,35 @@ function ModeSwitch() {
   );
 }
 
+function Attribution({ lines }: { lines: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="attribution-wrap">
+      {open && (
+        <div className="panel attribution-panel">
+          {lines.map((a) => (
+            <div key={a}>{a}</div>
+          ))}
+        </div>
+      )}
+      <button type="button" className="attribution-btn" onClick={() => setOpen(!open)}>
+        数据来源
+      </button>
+    </div>
+  );
+}
+
 function Main() {
   const data = use(sceneData);
   const mode = useApp((s) => s.mode);
   return (
     <>
       <Scene data={data} />
-      <header className="brand">
-        <h1>见光</h1>
-        <p>成都 · 狮子山片区 · 逐窗日照</p>
-      </header>
       <ModeSwitch />
       <TimeBar />
       {mode === 'hours' && <Legend />}
       <Inspector data={data} />
-      <footer className="attribution">
-        {data.district.attribution.map((a) => (
-          <span key={a}>{a}</span>
-        ))}
-      </footer>
+      <Attribution lines={data.district.attribution} />
     </>
   );
 }
@@ -77,7 +87,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 export function App() {
   return (
     <ErrorBoundary>
-      <Suspense fallback={<Splash text="正在载入狮子山片区 4212 栋楼……" />}>
+      <Suspense fallback={<Splash text="载入中" />}>
         <Main />
       </Suspense>
     </ErrorBoundary>

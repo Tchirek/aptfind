@@ -83,12 +83,7 @@ export function TimeBar() {
             <small>北京时间 · 真太阳时 {formatClock(tst)}</small>
           </div>
         </div>
-      ) : (
-        <p className="timebar-note">
-          外墙格子按<strong>大寒日</strong>真太阳时 8–16
-          时的累计日照着色。切换日期会改变点选窗位的时段条。
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }
