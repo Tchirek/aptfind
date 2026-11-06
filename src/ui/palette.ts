@@ -2,10 +2,10 @@
  * 日照时数的发散色阶，以大寒日 2 小时为界。
  *
  * 读法是"问题突出、正常退后"：不足 2 小时用蓝色，越缺越深、越扎眼；
- * 达标一侧用浅沙色到中橙色，不再出现深褐，避免满屏的南墙压过真正的问题。
+ * 达标一侧用低彩度的沙色到陶土色，避免满屏的南墙压过真正的问题。
  * 冷色阶通过色盲模拟与对比度校验（明度单调、相邻 ΔL ≥ 0.06、浅端对背景 ≥ 2:1）；
- * 暖色阶浅端有意贴近底色（对比度 1.28:1），阈值另由深色等时线标出。
- * 阈值两侧的浅端色差 ΔE 21.7（正常色觉），红色盲模拟下 18.4。
+ * 暖色阶浅端有意贴近底色（对比度 1.20:1），阈值另由深色等时线标出。
+ * 阈值两侧的浅端色差 ΔE 21.3（正常色觉），红色盲模拟下 18.1。
  */
 
 export const THRESHOLD_MINUTES = 120;
@@ -13,7 +13,7 @@ export const THRESHOLD_MINUTES = 120;
 /** 0 → 2 小时，由深到浅 */
 export const COOL_RAMP = ['#133466', '#24589e', '#3d7fd0', '#7fb0ec'] as const;
 /** 2 → 6 小时及以上，由浅到深 */
-export const WARM_RAMP = ['#f2d3a3', '#eab274', '#e0914c', '#cf7330'] as const;
+export const WARM_RAMP = ['#efdcc0', '#e5c49d', '#d9a979', '#c98d5b'] as const;
 /** 暖色阶覆盖的时长：2 小时之后再 4 小时到顶 */
 export const WARM_SPAN = 240;
 
@@ -41,6 +41,6 @@ export function rampColor(minutes: number): string {
 
 /** 时间轴上的状态色 */
 export const SPAN_COLOR = {
-  lit: '#e0914c',
+  lit: '#d9a979',
   unlit: '#cfcac0',
 } as const;
