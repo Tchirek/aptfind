@@ -5,7 +5,12 @@ import type { SceneData } from '../app/data';
 import { useApp } from '../app/store';
 import type { WindowGrid } from '../engine/geometry';
 import { isDrag } from './Buildings';
-import { buildFacadeGeometry, paintFacades, vertexToWindow } from './facadeGeometry';
+import {
+  buildFacadeGeometry,
+  facadeMaterial,
+  paintFacades,
+  vertexToWindow,
+} from './facadeGeometry';
 
 /** 选中窗位的黑框：四条细边，比窗格再往外抬一点 */
 function frameGeometry(grid: WindowGrid, i: number): BufferGeometry {
@@ -54,9 +59,11 @@ export function Facades({ data }: { data: SceneData }) {
     return g;
   }, [data.grid]);
 
+  const material = useMemo(() => facadeMaterial(), []);
+
   useEffect(() => {
-    paintFacades(geometry, data.dahanMinutes);
-  }, [geometry, data.dahanMinutes]);
+    paintFacades(geometry, data.grid, data.dahanMinutes);
+  }, [geometry, data.grid, data.dahanMinutes]);
 
   const frame = useMemo(
     () => (selection?.kind === 'window' ? frameGeometry(data.grid, selection.index) : null),
@@ -73,17 +80,10 @@ export function Facades({ data }: { data: SceneData }) {
     <group>
       <mesh
         geometry={geometry}
+        material={material}
         visible={mode === 'hours'}
         onClick={mode === 'hours' ? onClick : undefined}
-      >
-        <meshBasicMaterial
-          vertexColors
-          toneMapped={false}
-          polygonOffset
-          polygonOffsetFactor={-1}
-          polygonOffsetUnits={-4}
-        />
-      </mesh>
+      />
       {frame && (
         <mesh geometry={frame} renderOrder={7}>
           <meshBasicMaterial color="#1f1f1c" side={DoubleSide} toneMapped={false} />
