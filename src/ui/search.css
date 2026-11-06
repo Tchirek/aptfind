@@ -5,21 +5,21 @@
   padding: 0;
 }
 
+.search-box:focus-within {
+  border-color: var(--ink);
+}
+
 .search-input {
   display: block;
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   background: var(--panel);
   color: var(--ink);
   font-size: 13px;
   outline: none;
   box-sizing: border-box;
-}
-
-.search-input:focus {
-  border-color: var(--ink);
 }
 
 .search-dropdown {
@@ -48,7 +48,7 @@
 
 .search-item:hover,
 .search-item.hl {
-  background: var(--line);
+  background: #efede8;
 }
 
 .search-dot {

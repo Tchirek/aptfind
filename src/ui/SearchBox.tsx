@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, useCallback, useMemo, useRef, useState } from 'react';
 import type { SceneData } from '../app/data';
 import { buildGazetteer, type SearchEntry, search } from '../app/search';
 import { useApp } from '../app/store';
+import { terrainAt } from '../engine/district';
 import './search.css';
 
 const DOT_COLOR: Record<SearchEntry['kind'], string> = {
@@ -12,11 +13,10 @@ const DOT_COLOR: Record<SearchEntry['kind'], string> = {
 };
 
 export function SearchBox({ data }: { data: SceneData }) {
-  const { select, requestFly, setMarker } = useApp((s) => ({
-    select: s.select,
-    requestFly: s.requestFly,
-    setMarker: s.setMarker,
-  }));
+  // 逐个取函数：zustand v5 里选择器每次返回新对象会导致无限重渲染
+  const select = useApp((s) => s.select);
+  const requestFly = useApp((s) => s.requestFly);
+  const setMarker = useApp((s) => s.setMarker);
 
   const entries = useMemo(() => buildGazetteer(data.district), [data]);
 
@@ -38,11 +38,11 @@ export function SearchBox({ data }: { data: SceneData }) {
       } else if (e.kind === 'compound' && e.compound !== undefined) {
         select({ kind: 'compound', index: e.compound });
         setMarker(null);
-        requestFly([e.x, e.y, 0], 520);
+        requestFly([e.x, e.y, terrainAt(data.district.terrain, e.x, e.y)], 520);
       } else {
         select(null);
         setMarker({ x: e.x, y: e.y, label: e.name });
-        requestFly([e.x, e.y, 0], 260);
+        requestFly([e.x, e.y, terrainAt(data.district.terrain, e.x, e.y)], 260);
       }
       setQuery(e.name);
       setOpen(false);
@@ -53,7 +53,7 @@ export function SearchBox({ data }: { data: SceneData }) {
   );
 
   const onKey = useCallback(
-    (e: React.KeyboardEvent) => {
+    (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setHl((h) => (results.length ? (h + 1) % results.length : 0));
