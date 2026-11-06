@@ -4,6 +4,7 @@ import { useApp } from './app/store';
 import { Scene } from './scene/Scene';
 import { Inspector } from './ui/Inspector';
 import { Legend } from './ui/Legend';
+import { SearchBox } from './ui/SearchBox';
 import { TimeBar } from './ui/TimeBar';
 
 function ModeSwitch() {
@@ -55,6 +56,7 @@ function Main() {
   return (
     <>
       <Scene data={data} />
+      <SearchBox data={data} />
       <ModeSwitch />
       <TimeBar />
       {mode === 'hours' && <Legend />}
