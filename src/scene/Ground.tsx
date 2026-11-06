@@ -15,7 +15,10 @@ function terrainGeometry(d: District): BufferGeometry {
       const x = t.x0 + i * t.step;
       const y = t.y0 + j * t.step;
       pos.set([x, y, t.z[k] as number], k * 3);
-      uv.set([(x - ext.minX) / (ext.maxX - ext.minX), (y - ext.minY) / (ext.maxY - ext.minY)], k * 2);
+      uv.set(
+        [(x - ext.minX) / (ext.maxX - ext.minX), (y - ext.minY) / (ext.maxY - ext.minY)],
+        k * 2,
+      );
     }
   }
   const index = new Uint32Array((t.nx - 1) * (t.ny - 1) * 6);

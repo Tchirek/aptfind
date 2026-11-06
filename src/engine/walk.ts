@@ -82,11 +82,12 @@ export class WalkGraph {
     const m = net.edges.length / 2;
     const degree = new Uint32Array(n);
     for (let e = 0; e < m; e++) {
-      degree[net.edges[2 * e] as number]++;
-      degree[net.edges[2 * e + 1] as number]++;
+      for (const v of [net.edges[2 * e] as number, net.edges[2 * e + 1] as number])
+        degree[v] = (degree[v] as number) + 1;
     }
     this.offsets = new Uint32Array(n + 1);
-    for (let i = 0; i < n; i++) this.offsets[i + 1] = (this.offsets[i] as number) + (degree[i] as number);
+    for (let i = 0; i < n; i++)
+      this.offsets[i + 1] = (this.offsets[i] as number) + (degree[i] as number);
     this.targets = new Uint32Array(2 * m);
     this.weights = new Float32Array(2 * m);
     const fill = this.offsets.slice(0, n);
@@ -94,13 +95,16 @@ export class WalkGraph {
       const a = net.edges[2 * e] as number;
       const b = net.edges[2 * e + 1] as number;
       const len =
-        Math.hypot(this.x(a) - this.x(b), this.y(a) - this.y(b)) * (net.steps.has(e) ? STEPS_FACTOR : 1);
-      this.targets[fill[a] as number] = b;
-      this.weights[fill[a] as number] = len;
-      fill[a]++;
-      this.targets[fill[b] as number] = a;
-      this.weights[fill[b] as number] = len;
-      fill[b]++;
+        Math.hypot(this.x(a) - this.x(b), this.y(a) - this.y(b)) *
+        (net.steps.has(e) ? STEPS_FACTOR : 1);
+      const ia = fill[a] as number;
+      this.targets[ia] = b;
+      this.weights[ia] = len;
+      fill[a] = ia + 1;
+      const ib = fill[b] as number;
+      this.targets[ib] = a;
+      this.weights[ib] = len;
+      fill[b] = ib + 1;
     }
     for (let i = 0; i < n; i++) {
       const key = this.cellKey(this.x(i), this.y(i));

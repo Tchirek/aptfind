@@ -30,7 +30,8 @@ const log = (s: string) => {
 function loadAMap(): Promise<void> {
   const key = import.meta.env.VITE_AMAP_KEY as string | undefined;
   const code = import.meta.env.VITE_AMAP_SECURITY_CODE as string | undefined;
-  if (!key || !code) throw new Error('缺少 .env.local 里的 VITE_AMAP_KEY / VITE_AMAP_SECURITY_CODE');
+  if (!key || !code)
+    throw new Error('缺少 .env.local 里的 VITE_AMAP_KEY / VITE_AMAP_SECURITY_CODE');
   window._AMapSecurityConfig = { securityJsCode: code };
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -60,7 +61,9 @@ interface InputPoint {
 
 /** 逆地理编码：每批 20 个点，返回所在 AOI、所在住宅区、附近 POI */
 async function regeo(radius = 60): Promise<number> {
-  const input = (await (await fetch('/pipeline/raw/amap/input-points.json')).json()) as InputPoint[];
+  const input = (await (
+    await fetch('/pipeline/raw/amap/input-points.json')
+  ).json()) as InputPoint[];
   const geocoder = new window.AMap.Geocoder({ radius, extensions: 'all', batch: true });
   const out: unknown[] = [];
   for (let i = 0; i < input.length; i += 20) {
@@ -70,7 +73,9 @@ async function regeo(radius = 60): Promise<number> {
     const result = await new Promise<any>((resolve, reject) => {
       // biome-ignore lint/suspicious/noExplicitAny: 高德回调结果
       geocoder.getAddress(lnglats, (status: string, r: any) =>
-        status === 'complete' ? resolve(r) : reject(new Error(`regeo ${status}: ${JSON.stringify(r)}`)),
+        status === 'complete'
+          ? resolve(r)
+          : reject(new Error(`regeo ${status}: ${JSON.stringify(r)}`)),
       );
     });
     const list = result.regeocodes ?? [result.regeocode];
@@ -189,7 +194,20 @@ async function pois(grid = 3, only?: string[]): Promise<Record<string, number>> 
 /** 川师狮子山校区范围内按关键词补采校内建筑名（宿舍、教学楼、食堂等） */
 async function campusNames(): Promise<number> {
   const CAMPUS = { south: 30.6105, west: 104.1125, north: 30.6215, east: 104.1265 };
-  const keywords = ['宿舍', '舍', '教学楼', '实验楼', '食堂', '公寓', '苑', '楼', '馆', '学院', '中心', '办公'];
+  const keywords = [
+    '宿舍',
+    '舍',
+    '教学楼',
+    '实验楼',
+    '食堂',
+    '公寓',
+    '苑',
+    '楼',
+    '馆',
+    '学院',
+    '中心',
+    '办公',
+  ];
   const found = new Map<string, unknown>();
   const bounds = new window.AMap.Bounds(
     wgs84ToGcj02(CAMPUS.west, CAMPUS.south),

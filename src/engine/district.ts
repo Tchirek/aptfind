@@ -127,7 +127,15 @@ interface DistrictJson {
   core: [number, number, number, number];
   floorHeight: number;
   attribution: string[];
-  terrain: { x0: number; y0: number; step: number; nx: number; ny: number; base: number; z: number[] };
+  terrain: {
+    x0: number;
+    y0: number;
+    step: number;
+    nx: number;
+    ny: number;
+    base: number;
+    z: number[];
+  };
   compounds: {
     n: string;
     k: CompoundKind;

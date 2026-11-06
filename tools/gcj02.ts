@@ -4,7 +4,7 @@
  */
 
 const A = 6378245.0;
-const EE = 0.00669342162296594323;
+const EE = 0.006693421622965943;
 
 function transformLat(x: number, y: number): number {
   let r = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));

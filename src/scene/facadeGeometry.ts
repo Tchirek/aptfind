@@ -48,7 +48,10 @@ export function buildFacadeGeometry(grid: WindowGrid): BufferGeometry {
     const oy = ny * LIFT;
     const z0 = grid.z0[i] as number;
     const z1 = grid.z1[i] as number;
-    pos.set([x0 + ox, y0 + oy, z0, x1 + ox, y1 + oy, z0, x1 + ox, y1 + oy, z1, x0 + ox, y0 + oy, z1], i * 12);
+    pos.set(
+      [x0 + ox, y0 + oy, z0, x1 + ox, y1 + oy, z0, x1 + ox, y1 + oy, z1, x0 + ox, y0 + oy, z1],
+      i * 12,
+    );
 
     const f = grid.floor[i] as number;
     const w = grid.wall[i] as number;
@@ -120,7 +123,9 @@ export function paintFacades(g: BufferGeometry, grid: WindowGrid, minutes: Float
 export const vertexToWindow = (vertex: number) => Math.floor(vertex / 4);
 
 const coolStops = HOUR_BINS.filter((b) => b.to <= THRESHOLD_MINUTES).map((b) => new Color(b.color));
-const warmStops = HOUR_BINS.filter((b) => b.from >= THRESHOLD_MINUTES).map((b) => new Color(b.color));
+const warmStops = HOUR_BINS.filter((b) => b.from >= THRESHOLD_MINUTES).map(
+  (b) => new Color(b.color),
+);
 
 const vertexShader = /* glsl */ `
 attribute float aMinutes;

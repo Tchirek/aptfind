@@ -4,7 +4,14 @@ import { buildSolids, buildWindowGrid, wallAzimuth } from './geometry';
 import { SunlightEngine } from './sunlight';
 import { viewFrom } from './view';
 
-function box(index: number, x0: number, y0: number, x1: number, y1: number, height: number): Building {
+function box(
+  index: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  height: number,
+): Building {
   return {
     index,
     id: `b${index}`,
