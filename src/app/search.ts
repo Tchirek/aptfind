@@ -70,6 +70,18 @@ function ringCentroid(ring: Float64Array): [number, number] {
   return [x / n, y / n];
 }
 
+function ringArea(ring: Float64Array): number {
+  let a = 0;
+  const n = ring.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    a +=
+      (ring[2 * i] as number) * (ring[2 * j + 1] as number) -
+      (ring[2 * j] as number) * (ring[2 * i + 1] as number);
+  }
+  return Math.abs(a) / 2;
+}
+
 export function buildGazetteer(d: District): SearchEntry[] {
   const out: SearchEntry[] = [];
   d.compounds.forEach((c, k) => {
@@ -92,12 +104,24 @@ export function buildGazetteer(d: District): SearchEntry[] {
       compound: k,
     });
   });
+  // 同一地块里 150 m 内同名的楼（如由几块轮廓组成的图书馆）只收一条，取面积最大的那块
+  const labelled: { b: Building; x: number; y: number; area: number }[] = [];
   for (const b of d.buildings) {
     if (!b.label) continue;
-    const [x, y] = ringCentroid(b.rings[0] as Float64Array);
+    const ring = b.rings[0] as Float64Array;
+    const [x, y] = ringCentroid(ring);
+    const twin = labelled.find(
+      (o) =>
+        o.b.label === b.label && o.b.compound === b.compound && Math.hypot(o.x - x, o.y - y) < 150,
+    );
+    const area = ringArea(ring);
+    if (!twin) labelled.push({ b, x, y, area });
+    else if (area > twin.area) Object.assign(twin, { b, x, y, area });
+  }
+  for (const { b, x, y } of labelled) {
     out.push({
       kind: 'building',
-      name: b.label,
+      name: b.label as string,
       detail: b.compound >= 0 ? compoundFullName(d, b.compound) : '',
       x,
       y,

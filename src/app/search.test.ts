@@ -34,6 +34,13 @@ const district = {
   buildings: [
     { index: 0, id: 'a', rings: [ring(5, 5)], label: '图书馆', compound: 0 },
     { index: 1, id: 'b', rings: [ring(6, 6)], label: null, compound: 0 },
+    {
+      index: 2,
+      id: 'c',
+      rings: [Float64Array.of(20, 0, 50, 0, 50, 30, 20, 30)],
+      label: '图书馆',
+      compound: 0,
+    },
   ],
   pois: [
     { name: '狮子山地铁站B口', category: 'metro', x: 100, y: 100 },
@@ -60,7 +67,9 @@ describe('search', () => {
   it('楼名与所属地块一起搜', () => {
     const r = search(g, '川师图书馆');
     expect(r[0]?.name).toBe('图书馆');
-    expect(r[0]?.building).toBe(0);
+    // 两块同名轮廓合并成一条，取面积大的那块
+    expect(r.filter((e) => e.name === '图书馆')).toHaveLength(1);
+    expect(r[0]?.building).toBe(2);
   });
 
   it('前缀优先于包含', () => {
