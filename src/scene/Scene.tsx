@@ -9,6 +9,7 @@ import { ENU_ROTATION_X } from './coords';
 import { DevHandle } from './DevHandle';
 import { Facades } from './Facades';
 import { Ground } from './Ground';
+import { Overlays } from './Overlays';
 import { Sun } from './Sun';
 
 export const BACKGROUND = '#f3f2ee';
@@ -32,10 +33,11 @@ export function Scene({ data }: { data: SceneData }) {
         <Ground district={data.district} />
         <Buildings data={data} />
         <Facades data={data} />
+        <Overlays data={data} />
       </group>
       <MapControls
         makeDefault
-        target={[0, 0, 0]}
+        target={[0, 16, 0]}
         enableDamping
         dampingFactor={0.12}
         minDistance={30}

@@ -67,7 +67,10 @@ export function Buildings({ data }: { data: SceneData }) {
     if (b === undefined || !building) return;
     select({ kind: 'building', index: b });
     const [cx, cy] = centroid(building.rings[0] as Float64Array);
-    requestFly([cx, cy, building.height * 0.45], Math.max(110, building.height * 3.2));
+    requestFly(
+      [cx, cy, building.base + building.height * 0.45],
+      Math.max(110, building.height * 3.2),
+    );
   };
 
   return (
