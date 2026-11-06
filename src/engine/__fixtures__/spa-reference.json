@@ -1,0 +1,687 @@
+{
+  "source": "pvlib 0.16.1 spa_python (NREL SPA)",
+  "terms": [
+    {
+      "name": "冬至",
+      "year": 2026,
+      "longitude": 270.0,
+      "utcMs": 1797886213525
+    },
+    {
+      "name": "大寒",
+      "year": 2027,
+      "longitude": 300.0,
+      "utcMs": 1800430188744
+    },
+    {
+      "name": "春分",
+      "year": 2027,
+      "longitude": 0.0,
+      "utcMs": 1805574281455
+    },
+    {
+      "name": "夏至",
+      "year": 2027,
+      "longitude": 90.0,
+      "utcMs": 1813587048953
+    },
+    {
+      "name": "秋分",
+      "year": 2027,
+      "longitude": 180.0,
+      "utcMs": 1821679300619
+    }
+  ],
+  "rows": [
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800403200000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 113.08424,
+      "elevation": -0.92209,
+      "apparentElevation": -0.92209,
+      "eotMinutes": -10.7865
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800405420000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 117.95746,
+      "elevation": 6.26347,
+      "apparentElevation": 6.39811,
+      "eotMinutes": -10.7941
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800407640000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 123.36458,
+      "elevation": 13.11419,
+      "apparentElevation": 13.18377,
+      "eotMinutes": -10.8018
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800409860000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 129.46321,
+      "elevation": 19.5252,
+      "apparentElevation": 19.57187,
+      "eotMinutes": -10.8094
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800412080000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 136.41952,
+      "elevation": 25.35952,
+      "apparentElevation": 25.39471,
+      "eotMinutes": -10.8171
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800414300000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 144.38561,
+      "elevation": 30.44247,
+      "apparentElevation": 30.47096,
+      "eotMinutes": -10.8247
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800416520000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 153.45001,
+      "elevation": 34.56301,
+      "apparentElevation": 34.58735,
+      "eotMinutes": -10.8323
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800418740000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 163.56039,
+      "elevation": 37.49105,
+      "apparentElevation": 37.51293,
+      "eotMinutes": -10.8399
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800420960000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 174.44842,
+      "elevation": 39.01871,
+      "apparentElevation": 39.03943,
+      "eotMinutes": -10.8475
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800423180000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 185.62766,
+      "elevation": 39.01895,
+      "apparentElevation": 39.03968,
+      "eotMinutes": -10.8551
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800425400000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 196.51666,
+      "elevation": 37.49174,
+      "apparentElevation": 37.51362,
+      "eotMinutes": -10.8627
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800427620000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 206.62893,
+      "elevation": 34.56404,
+      "apparentElevation": 34.58838,
+      "eotMinutes": -10.8703
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800429840000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 215.69608,
+      "elevation": 30.44369,
+      "apparentElevation": 30.47217,
+      "eotMinutes": -10.8779
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800432060000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 223.66575,
+      "elevation": 25.36077,
+      "apparentElevation": 25.39596,
+      "eotMinutes": -10.8854
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800434280000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 230.62657,
+      "elevation": 19.52636,
+      "apparentElevation": 19.57303,
+      "eotMinutes": -10.893
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800436500000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 236.73079,
+      "elevation": 13.11519,
+      "apparentElevation": 13.18476,
+      "eotMinutes": -10.9005
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800438720000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 242.14483,
+      "elevation": 6.26426,
+      "apparentElevation": 6.39888,
+      "eotMinutes": -10.9081
+    },
+    {
+      "label": "成都·大寒 2027-01-20",
+      "utcMs": 1800440940000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 247.02665,
+      "elevation": -0.92147,
+      "apparentElevation": -0.92147,
+      "eotMinutes": -10.9156
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797899400000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 121.32734,
+      "elevation": 5.37554,
+      "apparentElevation": 5.52753,
+      "eotMinutes": 1.6808
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797901860000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 127.34683,
+      "elevation": 12.65924,
+      "apparentElevation": 12.73123,
+      "eotMinutes": 1.6667
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797904320000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 134.23024,
+      "elevation": 19.33978,
+      "apparentElevation": 19.38692,
+      "eotMinutes": 1.6526
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797906780000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 142.15721,
+      "elevation": 25.22423,
+      "apparentElevation": 25.25963,
+      "eotMinutes": 1.6385
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797909240000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 151.2545,
+      "elevation": 30.07273,
+      "apparentElevation": 30.10163,
+      "eotMinutes": 1.6243
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797911700000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 161.5113,
+      "elevation": 33.61364,
+      "apparentElevation": 33.63886,
+      "eotMinutes": 1.6102
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797914160000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 172.68257,
+      "elevation": 35.58853,
+      "apparentElevation": 35.61198,
+      "eotMinutes": 1.5961
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797916620000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 184.26101,
+      "elevation": 35.82453,
+      "apparentElevation": 35.84778,
+      "eotMinutes": 1.582
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797919080000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 195.59899,
+      "elevation": 34.29938,
+      "apparentElevation": 34.32396,
+      "eotMinutes": 1.5679
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797921540000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 206.13358,
+      "elevation": 31.15078,
+      "apparentElevation": 31.17848,
+      "eotMinutes": 1.5538
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797924000000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 215.5476,
+      "elevation": 26.62212,
+      "apparentElevation": 26.65543,
+      "eotMinutes": 1.5397
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797926460000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 223.77657,
+      "elevation": 20.9873,
+      "apparentElevation": 21.03056,
+      "eotMinutes": 1.5256
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797928920000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 230.92038,
+      "elevation": 14.49715,
+      "apparentElevation": 14.56025,
+      "eotMinutes": 1.5115
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797931380000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 237.15082,
+      "elevation": 7.35729,
+      "apparentElevation": 7.47505,
+      "eotMinutes": 1.4974
+    },
+    {
+      "label": "成都·冬至 2026-12-22",
+      "utcMs": 1797933840000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 242.65395,
+      "elevation": -0.27301,
+      "apparentElevation": 0.24948,
+      "eotMinutes": 1.4832
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813532400000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 68.96132,
+      "elevation": 10.64384,
+      "apparentElevation": 10.72861,
+      "eotMinutes": -1.6462
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813535580000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 74.70422,
+      "elevation": 21.47454,
+      "apparentElevation": 21.51675,
+      "eotMinutes": -1.6541
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813538760000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 80.20597,
+      "elevation": 32.5998,
+      "apparentElevation": 32.62601,
+      "eotMinutes": -1.6621
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813541940000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 85.88341,
+      "elevation": 43.91197,
+      "apparentElevation": 43.92943,
+      "eotMinutes": -1.6701
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813545120000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 92.45804,
+      "elevation": 55.30583,
+      "apparentElevation": 55.31748,
+      "eotMinutes": -1.678
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813548300000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 101.77924,
+      "elevation": 66.61643,
+      "apparentElevation": 66.62371,
+      "eotMinutes": -1.686
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813551480000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 121.5167,
+      "elevation": 77.28042,
+      "apparentElevation": 77.2842,
+      "eotMinutes": -1.694
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813554660000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 190.49158,
+      "elevation": 82.70646,
+      "apparentElevation": 82.70859,
+      "eotMinutes": -1.702
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813557840000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 244.76032,
+      "elevation": 75.09222,
+      "apparentElevation": 75.09669,
+      "eotMinutes": -1.7099
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813561020000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 260.68573,
+      "elevation": 64.17354,
+      "apparentElevation": 64.18169,
+      "eotMinutes": -1.7179
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813564200000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 269.11366,
+      "elevation": 52.82218,
+      "apparentElevation": 52.83495,
+      "eotMinutes": -1.7259
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813567380000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 275.39826,
+      "elevation": 41.43591,
+      "apparentElevation": 41.45494,
+      "eotMinutes": -1.7338
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813570560000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 280.99235,
+      "elevation": 30.15605,
+      "apparentElevation": 30.18486,
+      "eotMinutes": -1.7418
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813573740000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 286.51592,
+      "elevation": 19.08529,
+      "apparentElevation": 19.13308,
+      "eotMinutes": -1.7498
+    },
+    {
+      "label": "成都·夏至 2027-06-21",
+      "utcMs": 1813576920000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 292.35698,
+      "elevation": 8.33567,
+      "apparentElevation": 8.44138,
+      "eotMinutes": -1.7577
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805585400000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 92.39139,
+      "elevation": 4.13027,
+      "apparentElevation": 4.31475,
+      "eotMinutes": -7.383
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805588220000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 98.53682,
+      "elevation": 14.20084,
+      "apparentElevation": 14.26524,
+      "eotMinutes": -7.3733
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805591040000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 105.25177,
+      "elevation": 24.10171,
+      "apparentElevation": 24.13895,
+      "eotMinutes": -7.3636
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805593860000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 113.07633,
+      "elevation": 33.6626,
+      "apparentElevation": 33.68777,
+      "eotMinutes": -7.3539
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805596680000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 122.79384,
+      "elevation": 42.61256,
+      "apparentElevation": 42.63083,
+      "eotMinutes": -7.3442
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805599500000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 135.54382,
+      "elevation": 50.48196,
+      "apparentElevation": 50.49584,
+      "eotMinutes": -7.3345
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805602320000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 152.63435,
+      "elevation": 56.46088,
+      "apparentElevation": 56.47203,
+      "eotMinutes": -7.3248
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805605140000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 174.17931,
+      "elevation": 59.39438,
+      "apparentElevation": 59.40433,
+      "eotMinutes": -7.3151
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805607960000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 196.96823,
+      "elevation": 58.41228,
+      "apparentElevation": 58.42263,
+      "eotMinutes": -7.3053
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805610780000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 216.49395,
+      "elevation": 53.83551,
+      "apparentElevation": 53.84781,
+      "eotMinutes": -7.2956
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805613600000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 231.31843,
+      "elevation": 46.80468,
+      "apparentElevation": 46.82047,
+      "eotMinutes": -7.2859
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805616420000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 242.42226,
+      "elevation": 38.33239,
+      "apparentElevation": 38.35363,
+      "eotMinutes": -7.2762
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805619240000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 251.10177,
+      "elevation": 29.04444,
+      "apparentElevation": 29.07456,
+      "eotMinutes": -7.2665
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805622060000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 258.31432,
+      "elevation": 19.29759,
+      "apparentElevation": 19.34483,
+      "eotMinutes": -7.2567
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805624880000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 264.70803,
+      "elevation": 9.30487,
+      "apparentElevation": 9.40073,
+      "eotMinutes": -7.247
+    },
+    {
+      "label": "成都·春分 2027-03-21",
+      "utcMs": 1805627700000,
+      "lat": 30.616,
+      "lon": 104.12,
+      "azimuth": 270.74997,
+      "elevation": -0.79019,
+      "apparentElevation": -0.18169,
+      "eotMinutes": -7.2373
+    },
+    {
+      "label": "NREL 算例 2003-10-17",
+      "utcMs": 1066419030000,
+      "lat": 39.742476,
+      "lon": -105.1786,
+      "azimuth": 194.34024,
+      "elevation": 39.87205,
+      "apparentElevation": 39.89216,
+      "eotMinutes": 14.6415
+    }
+  ]
+}
