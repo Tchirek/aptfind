@@ -369,6 +369,79 @@ button {
   line-height: 1.5;
 }
 
+/* 视野与步行可达 */
+.facts {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+.facts dt {
+  color: var(--ink-3);
+}
+.facts dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.meter {
+  display: inline-block;
+  width: 96px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e6e3dc;
+  overflow: hidden;
+}
+.meter i {
+  display: block;
+  height: 100%;
+  background: var(--ink-2);
+}
+.access {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.access li + li {
+  border-top: 1px solid #ebe8e2;
+}
+.access button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  border-radius: 4px;
+}
+.access button:hover:not(:disabled) {
+  background: #f1efea;
+}
+.access button:disabled {
+  cursor: default;
+  color: var(--ink-3);
+}
+.access li.on button {
+  background: #ece9e2;
+}
+.access-kind {
+  color: var(--ink-3);
+}
+.access-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.access-time {
+  color: var(--ink-2);
+}
+
 .attribution-wrap {
   position: absolute;
   right: 24px;
@@ -398,6 +471,25 @@ button {
 }
 .attribution-panel div + div {
   margin-top: 4px;
+}
+
+/* 地图标注 */
+.map-label {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-2);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  text-shadow:
+    0 0 2px #f3f2ee,
+    0 0 2px #f3f2ee,
+    0 0 3px #f3f2ee;
+}
+.map-label.strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .splash {

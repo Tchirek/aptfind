@@ -1,24 +1,53 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getEngine, type SceneData } from '../app/data';
 import { formatClock, formatDuration, windowOrientation } from '../app/format';
+import { buildingTitle } from '../app/search';
 import { presetDate, useApp } from '../app/store';
-import { type Building, CLASS_LABEL } from '../engine/district';
+import { type Building, CLASS_LABEL, type District } from '../engine/district';
 import { floorsOf } from '../engine/geometry';
 import { RULE_DAHAN } from '../engine/standard';
-import { AWAY, LIT, type Span, SunPath } from '../engine/sunlight';
+import { AWAY, LIT, type Span, SunPath, TERRAIN } from '../engine/sunlight';
+import { AccessSection } from './AccessSection';
 import { THRESHOLD_MINUTES } from './palette';
 import { Timeline } from './Timeline';
-
-function placeName(data: SceneData, b: Building): string {
-  const c = data.district.compounds[b.compound];
-  return c ? c.name : '未命名地块';
-}
+import { ViewSection } from './ViewSection';
 
 function heightNote(b: Building): string {
   const floors = floorsOf(b.height);
   if (b.source === 'survey') return `${floors} 层 · 已核实`;
   if (b.source === 'user') return `${floors} 层 · 已修改`;
   return `${floors} 层 · 约 ${Math.round(b.height)} m`;
+}
+
+function builtYear(d: District, k: number): number | null {
+  const c = d.compounds[k];
+  if (!c) return null;
+  return c.builtYear ?? (c.parent >= 0 ? (d.compounds[c.parent]?.builtYear ?? null) : null);
+}
+
+function ringCenter(ring: Float64Array): [number, number] {
+  let x = 0;
+  let y = 0;
+  for (let i = 0; i < ring.length; i += 2) {
+    x += ring[i] as number;
+    y += ring[i + 1] as number;
+  }
+  return [(2 * x) / ring.length, (2 * y) / ring.length];
+}
+
+/** 一组窗位里大寒日不足 2 小时的比例 */
+function shortfall(data: SceneData, buildings: Iterable<number>): { below: number; count: number } {
+  let below = 0;
+  let count = 0;
+  for (const b of buildings) {
+    const start = data.windowRange[2 * b] as number;
+    const n = data.windowRange[2 * b + 1] as number;
+    for (let i = start; i < start + n; i++) {
+      count++;
+      if ((data.dahanMinutes[i] as number) < THRESHOLD_MINUTES) below++;
+    }
+  }
+  return { below, count };
 }
 
 function Verdict({ minutes }: { minutes: number }) {
@@ -31,11 +60,24 @@ function Verdict({ minutes }: { minutes: number }) {
   );
 }
 
+function Head({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) {
+  return (
+    <header className="inspector-head">
+      <div className="eyebrow">{eyebrow}</div>
+      <h2>{title}</h2>
+      {sub && <p className="sub">{sub}</p>}
+    </header>
+  );
+}
+
 function WindowDetail({ data, index }: { data: SceneData; index: number }) {
   const day = useApp((s) => s.day);
   const setFocus = useApp((s) => s.setFocusBuilding);
-  const b = data.district.buildings[data.grid.building[index] as number] as Building;
+  const d = data.district;
+  const b = d.buildings[data.grid.building[index] as number] as Building;
   const floor = (data.grid.floor[index] as number) + 1;
+  const { title, subtitle } = buildingTitle(d, b);
+  const year = builtYear(d, b.compound);
   const [result, setResult] = useState<{ minutes: number; spans: Span[]; path: SunPath } | null>(
     null,
   );
@@ -48,8 +90,8 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
         date: presetDate(day),
         startTst: RULE_DAHAN.startTst,
         endTst: RULE_DAHAN.endTst,
-        lat: data.district.origin.lat,
-        lon: data.district.origin.lon,
+        lat: d.origin.lat,
+        lon: d.origin.lon,
       });
       const spans: Span[] = [];
       const minutes = engine.trace(
@@ -64,25 +106,26 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
     return () => {
       alive = false;
     };
-  }, [data, index, day]);
+  }, [data, d, index, day]);
 
   const blockers = useMemo(
     () => (result ? result.spans.filter((s) => s.state !== LIT && s.state !== AWAY) : []),
     [result],
   );
+  const [cx, cy] = ringCenter(b.rings[0] as Float64Array);
 
   return (
     <>
-      <header className="inspector-head">
-        <div className="eyebrow">{CLASS_LABEL[b.cls]}</div>
-        <h2>{placeName(data, b)}</h2>
-        <p className="sub">
-          {windowOrientation(data.grid, index)} · 第 {floor} 层，共 {floorsOf(b.height)} 层
-        </p>
-      </header>
+      <Head
+        eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
+          .filter(Boolean)
+          .join(' · ')}
+        title={title}
+        sub={`${windowOrientation(data.grid, index)} · ${floor} 层 / 共 ${floorsOf(b.height)} 层`}
+      />
 
       <section>
-        <div className="label">{day}日日照（真太阳时 8–16 时）</div>
+        <div className="label">{day}日照</div>
         {result ? (
           <>
             <div className="big-number">{formatDuration(result.minutes)}</div>
@@ -90,7 +133,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
             <Timeline spans={result.spans} path={result.path} onFocus={setFocus} />
           </>
         ) : (
-          <div className="big-number muted">计算中…</div>
+          <div className="big-number muted">…</div>
         )}
       </section>
 
@@ -99,11 +142,11 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
           <div className="label">遮挡来源</div>
           <ul className="blockers">
             {blockers.map((s) => {
-              const ob = data.district.buildings[s.state] as Building;
+              const ob = s.state === TERRAIN ? null : d.buildings[s.state];
               return (
                 <li
                   key={`${s.from}-${s.state}`}
-                  onPointerEnter={() => setFocus(s.state)}
+                  onPointerEnter={() => setFocus(ob ? s.state : null)}
                   onPointerLeave={() => setFocus(null)}
                 >
                   <span className="mono">
@@ -111,7 +154,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
                     {formatClock(result?.path.beijingAt(s.to) ?? s.to)}
                   </span>
                   <span>
-                    {placeName(data, ob)} · {floorsOf(ob.height)} 层
+                    {ob ? `${buildingTitle(d, ob).title} · ${floorsOf(ob.height)} 层` : '山体'}
                   </span>
                 </li>
               );
@@ -120,29 +163,33 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
         </section>
       )}
 
+      <ViewSection data={data} index={index} />
+      <AccessSection x={cx} y={cy} />
+
       <section className="note">
-        <div className="label">楼高数据</div>
-        <p>本楼：{heightNote(b)}</p>
+        <p>{heightNote(b)}</p>
       </section>
     </>
   );
 }
 
 function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
-  const b = data.district.buildings[index] as Building;
-  const start = data.windowRange[2 * index] as number;
-  const count = data.windowRange[2 * index + 1] as number;
-  let below = 0;
-  for (let i = start; i < start + count; i++)
-    if ((data.dahanMinutes[i] as number) < THRESHOLD_MINUTES) below++;
+  const d = data.district;
+  const b = d.buildings[index] as Building;
+  const { title, subtitle } = buildingTitle(d, b);
+  const year = builtYear(d, b.compound);
+  const { below, count } = shortfall(data, [index]);
+  const [cx, cy] = ringCenter(b.rings[0] as Float64Array);
 
   return (
     <>
-      <header className="inspector-head">
-        <div className="eyebrow">{CLASS_LABEL[b.cls]}</div>
-        <h2>{placeName(data, b)}</h2>
-        <p className="sub">{heightNote(b)}</p>
-      </header>
+      <Head
+        eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
+          .filter(Boolean)
+          .join(' · ')}
+        title={title}
+        sub={heightNote(b)}
+      />
       {count > 0 && (
         <section>
           <div className="label">大寒日不足 2 小时的窗位</div>
@@ -151,10 +198,54 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
             <small>%</small>
           </div>
           <p className="sub">
-            共 {count} 个窗位，{below} 个不足。
+            {below} / {count}
           </p>
         </section>
       )}
+      <AccessSection x={cx} y={cy} />
+    </>
+  );
+}
+
+const KIND_LABEL = { residential: '小区', school: '学校', other: '地块' } as const;
+
+function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
+  const d = data.district;
+  const c = d.compounds[index];
+  const members = useMemo(() => {
+    const children = new Set(d.compounds.flatMap((k, i) => (k.parent === index ? [i] : [])));
+    return d.buildings
+      .filter((b) => b.compound === index || children.has(b.compound))
+      .map((b) => b.index);
+  }, [d, index]);
+  if (!c) return null;
+  const { below, count } = shortfall(data, members);
+  const largest = [...c.rings].sort((a, b) => b.length - a.length)[0] as Float64Array;
+  const [cx, cy] = ringCenter(largest);
+  const parent = c.parent >= 0 ? d.compounds[c.parent] : undefined;
+
+  return (
+    <>
+      <Head
+        eyebrow={[KIND_LABEL[c.kind], parent?.name, c.builtYear ? `${c.builtYear} 年建成` : '']
+          .filter(Boolean)
+          .join(' · ')}
+        title={c.name}
+        sub={`${members.length} 栋`}
+      />
+      {count > 0 && (
+        <section>
+          <div className="label">大寒日不足 2 小时的窗位</div>
+          <div className="big-number">
+            {Math.round((below / count) * 100)}
+            <small>%</small>
+          </div>
+          <p className="sub">
+            {below} / {count}
+          </p>
+        </section>
+      )}
+      <AccessSection x={cx} y={cy} />
     </>
   );
 }
@@ -168,11 +259,9 @@ export function Inspector({ data }: { data: SceneData }) {
       <button type="button" className="close" onClick={() => select(null)} aria-label="关闭">
         ×
       </button>
-      {selection.kind === 'window' ? (
-        <WindowDetail data={data} index={selection.index} />
-      ) : (
-        <BuildingDetail data={data} index={selection.index} />
-      )}
+      {selection.kind === 'window' && <WindowDetail data={data} index={selection.index} />}
+      {selection.kind === 'building' && <BuildingDetail data={data} index={selection.index} />}
+      {selection.kind === 'compound' && <CompoundDetail data={data} index={selection.index} />}
     </aside>
   );
 }

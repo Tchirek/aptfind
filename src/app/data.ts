@@ -6,6 +6,7 @@
 import { type District, loadDistrict } from '../engine/district';
 import { buildSolids, buildWindowGrid, gridHash, type WindowGrid } from '../engine/geometry';
 import { SunlightEngine } from '../engine/sunlight';
+import { type SnappedPoi, snapPois, WalkGraph } from '../engine/walk';
 
 export interface SceneData {
   district: District;
@@ -56,4 +57,15 @@ export async function getEngine(): Promise<SunlightEngine> {
     engine = new SunlightEngine(buildSolids(district.buildings, undefined, district.terrain));
   }
   return engine;
+}
+
+/** 步行网与吸附到路网的设施，首次需要时构建 */
+let walk: { graph: WalkGraph; pois: SnappedPoi[] } | null = null;
+export async function getWalk(): Promise<{ graph: WalkGraph; pois: SnappedPoi[] }> {
+  if (!walk) {
+    const { district } = await sceneData;
+    const graph = new WalkGraph(district.network);
+    walk = { graph, pois: snapPois(graph, district.pois) };
+  }
+  return walk;
 }
