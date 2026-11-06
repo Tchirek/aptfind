@@ -12,8 +12,8 @@ const ROAD_MINOR = '#dedad1';
 const WATER = '#bfccd3';
 const RESIDENTIAL_FILL = 'rgba(214, 205, 186, 0.22)';
 const SCHOOL_FILL = 'rgba(201, 211, 190, 0.32)';
-const BOUNDARY = 'rgba(120, 112, 98, 0.55)';
-const CAMPUS_BOUNDARY = 'rgba(70, 92, 66, 0.85)';
+const BOUNDARY = 'rgba(120, 112, 98, 0.38)';
+const CAMPUS_BOUNDARY = 'rgba(70, 92, 66, 0.6)';
 
 /** 各级道路的路面宽度（米） */
 const ROAD_WIDTH = [26, 20, 14, 9, 6, 3.5] as const;
@@ -105,8 +105,8 @@ export function buildGroundTexture(d: District, size = 4096): CanvasTexture {
   for (const c of d.compounds) {
     const campus = isCampus(c.name) && c.parent < 0;
     ctx.strokeStyle = campus ? CAMPUS_BOUNDARY : BOUNDARY;
-    ctx.lineWidth = (campus ? 2.4 : 1.1) * sx;
-    ctx.setLineDash(c.source === 'derived' ? [6 * sx, 4 * sx] : []);
+    ctx.lineWidth = (campus ? 1.6 : 0.8) * sx;
+    ctx.setLineDash(c.source === 'derived' ? [4 * sx, 3 * sx] : []);
     for (const r of c.rings) {
       path(r, true);
       ctx.stroke();

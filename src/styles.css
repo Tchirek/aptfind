@@ -55,6 +55,8 @@ button {
 
 .panel {
   position: absolute;
+  /* 压过地图标注（drei Html 的 z-index 在 0–30 之间） */
+  z-index: 40;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
