@@ -60,26 +60,6 @@ button {
   border-radius: var(--radius);
 }
 
-/* 标题 */
-.brand {
-  position: absolute;
-  top: 20px;
-  left: 24px;
-  pointer-events: none;
-}
-.brand h1 {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-}
-.brand p {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--ink-2);
-  letter-spacing: 0.04em;
-}
-
 /* 模式切换 */
 .mode-switch {
   top: 20px;
@@ -169,16 +149,11 @@ button {
   font-size: 11px;
   color: var(--ink-3);
 }
-.timebar-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ink-2);
-}
 
 /* 图例 */
 .legend {
   left: 24px;
-  top: 78px;
+  top: 20px;
   padding: 10px 12px;
   margin: 0;
 }
@@ -218,21 +193,6 @@ button {
   top: -3px;
   bottom: 14px;
   width: 2px;
-  background: var(--ink);
-  border-radius: 1px;
-}
-.legend-note {
-  margin: 6px 0 0;
-  font-size: 11px;
-  color: var(--ink-2);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.tick-mark {
-  display: inline-block;
-  width: 2px;
-  height: 10px;
   background: var(--ink);
   border-radius: 1px;
 }
@@ -391,15 +351,35 @@ button {
   line-height: 1.5;
 }
 
-.attribution {
+.attribution-wrap {
   position: absolute;
   right: 24px;
-  bottom: 6px;
+  bottom: 20px;
   display: flex;
-  gap: 12px;
-  font-size: 10px;
-  color: var(--ink-3);
-  pointer-events: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.attribution-btn {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.attribution-btn:hover {
+  background: #efede8;
+}
+.attribution-panel {
+  position: static;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--ink-2);
+  max-width: 280px;
+}
+.attribution-panel div + div {
+  margin-top: 4px;
 }
 
 .splash {
@@ -419,17 +399,16 @@ button {
 }
 
 @media (max-width: 720px) {
-  .brand {
-    top: 12px;
-    left: 14px;
-  }
   .mode-switch {
     top: 12px;
     right: 12px;
   }
-  .legend,
-  .attribution {
+  .legend {
     display: none;
+  }
+  .attribution-wrap {
+    right: 12px;
+    bottom: 10px;
   }
   .timebar {
     bottom: 10px;
