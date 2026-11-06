@@ -1,21 +1,27 @@
-import { HOUR_BINS, THRESHOLD_MINUTES } from './palette';
+import { COOL_RAMP, THRESHOLD_MINUTES, WARM_RAMP, WARM_SPAN } from './palette';
 
-const fmt = (m: number) => (m === 0 ? '0' : `${m / 60}`);
+const TOTAL = THRESHOLD_MINUTES + WARM_SPAN;
+const TICKS = [0, 60, 120, 240, 360];
+const pct = (m: number) => `${(m / TOTAL) * 100}%`;
 
 export function Legend() {
+  const cool = `linear-gradient(to right, ${COOL_RAMP.join(', ')})`;
+  const warm = `linear-gradient(to right, ${WARM_RAMP.join(', ')})`;
   return (
-    <figure className="panel legend" aria-label="日照时数图例">
-      <figcaption>大寒日日照（小时）</figcaption>
-      <div className="swatches">
-        {HOUR_BINS.map((b) => (
-          <div
-            key={b.from}
-            className={b.from === THRESHOLD_MINUTES ? 'swatch threshold' : 'swatch'}
-          >
-            <i style={{ background: b.color }} />
-            <span>{fmt(b.from)}</span>
-          </div>
+    <figure className="panel legend" aria-label="大寒日日照时数图例">
+      <figcaption>大寒日日照</figcaption>
+      <div className="ramp">
+        <i style={{ width: pct(THRESHOLD_MINUTES), background: cool }} />
+        <i style={{ width: pct(WARM_SPAN), background: warm }} />
+        <b style={{ left: pct(THRESHOLD_MINUTES) }} />
+      </div>
+      <div className="ramp-ticks">
+        {TICKS.map((m) => (
+          <span key={m} style={{ left: pct(m) }}>
+            {m === TOTAL ? '6+' : m / 60}
+          </span>
         ))}
+        <em>小时</em>
       </div>
     </figure>
   );

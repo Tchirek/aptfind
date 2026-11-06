@@ -17,7 +17,7 @@ import {
   UniformsUtils,
 } from 'three';
 import type { WindowGrid } from '../engine/geometry';
-import { HOUR_BINS, THRESHOLD_MINUTES } from '../ui/palette';
+import { COOL_RAMP, THRESHOLD_MINUTES, WARM_RAMP, WARM_SPAN } from '../ui/palette';
 
 /** 色面离墙面的距离（米），配合 polygonOffset 避免与墙面深度冲突 */
 const LIFT = 0.05;
@@ -122,10 +122,8 @@ export function paintFacades(g: BufferGeometry, grid: WindowGrid, minutes: Float
  */
 export const vertexToWindow = (vertex: number) => Math.floor(vertex / 4);
 
-const coolStops = HOUR_BINS.filter((b) => b.to <= THRESHOLD_MINUTES).map((b) => new Color(b.color));
-const warmStops = HOUR_BINS.filter((b) => b.from >= THRESHOLD_MINUTES).map(
-  (b) => new Color(b.color),
-);
+const coolStops = COOL_RAMP.map((c) => new Color(c));
+const warmStops = WARM_RAMP.map((c) => new Color(c));
 
 const vertexShader = /* glsl */ `
 attribute float aMinutes;
@@ -152,6 +150,7 @@ const fragmentShader = /* glsl */ `
 uniform vec3 uCool[4];
 uniform vec3 uWarm[4];
 uniform float uThreshold;
+uniform float uWarmSpan;
 uniform vec3 uInk;
 varying float vMinutes;
 varying float vFloor;
@@ -166,7 +165,7 @@ vec3 ramp(float m) {
     int i = int(min(floor(t), 2.0));
     return mix(uCool[i], uCool[i + 1], t - float(i));
   }
-  float t = clamp((m - uThreshold) / 240.0, 0.0, 1.0) * 3.0;
+  float t = clamp((m - uThreshold) / uWarmSpan, 0.0, 1.0) * 3.0;
   int i = int(min(floor(t), 2.0));
   return mix(uWarm[i], uWarm[i + 1], t - float(i));
 }
@@ -203,6 +202,7 @@ export function facadeMaterial(): ShaderMaterial {
         uCool: { value: coolStops },
         uWarm: { value: warmStops },
         uThreshold: { value: THRESHOLD_MINUTES },
+        uWarmSpan: { value: WARM_SPAN },
         uInk: { value: new Color('#1f1f1c') },
       },
     ]),
