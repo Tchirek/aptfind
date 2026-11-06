@@ -40,16 +40,20 @@ export function Timeline({
 }) {
   const { startTst, endTst } = path.day;
   const x = (t: number) => ((t - startTst) / (endTst - startTst)) * W;
+  // 刻度只标北京时间的整点：真太阳时与北京时间在一天内近似平移，按两端线性换算位置
+  const bjStart = path.beijingAt(startTst);
+  const bjEnd = path.beijingAt(endTst);
+  const xBj = (bj: number) => ((bj - bjStart) / (bjEnd - bjStart)) * W;
   const hours: number[] = [];
-  for (let h = Math.ceil(startTst / 60); h <= Math.floor(endTst / 60); h++) hours.push(h);
+  for (let h = Math.ceil(bjStart / 60); h <= Math.floor(bjEnd / 60); h++) hours.push(h);
 
   const merged = mergeSpans(spans);
 
   return (
     <figure className="timeline">
-      <svg viewBox={`-16 -14 ${W + 32} ${H + 30}`} width="100%" role="img" aria-label="日照时段">
+      <svg viewBox={`-16 -14 ${W + 32} ${H + 16}`} width="100%" role="img" aria-label="日照时段">
         {hours.map((h) => (
-          <text key={`t${h}`} x={x(h * 60)} y={-4} className="tick" textAnchor="middle">
+          <text key={`t${h}`} x={xBj(h * 60)} y={-4} className="tick" textAnchor="middle">
             {h}
           </text>
         ))}
@@ -75,11 +79,6 @@ export function Timeline({
             </rect>
           );
         })}
-        {[startTst, (startTst + endTst) / 2, endTst].map((t) => (
-          <text key={`b${t}`} x={x(t)} y={H + 14} className="tick muted" textAnchor="middle">
-            {formatClock(path.beijingAt(t))}
-          </text>
-        ))}
       </svg>
       <figcaption>
         <span>
