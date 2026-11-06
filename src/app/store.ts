@@ -20,7 +20,21 @@ export function presetDate(p: DayPreset): CivilDate {
 export type Selection =
   | { kind: 'window'; index: number }
   | { kind: 'building'; index: number }
+  | { kind: 'compound'; index: number }
   | null;
+
+/** 地图上的点标记：搜索到的设施、道路等没有对应楼的位置 */
+export interface Marker {
+  x: number;
+  y: number;
+  label: string;
+}
+
+/** 正在显示的步行路线（平面坐标折线） */
+export interface Route {
+  points: Float64Array;
+  label: string;
+}
 
 /** 镜头飞行请求：看向 ENU 坐标 target，相机距离 distance（米） */
 export interface FlyTo {
@@ -39,6 +53,8 @@ interface AppState {
   /** 在时间轴上悬停/点选的挡光建筑，用于在场景里高亮 */
   focusBuilding: number | null;
   flyTo: FlyTo | null;
+  marker: Marker | null;
+  route: Route | null;
   setMode: (mode: ViewMode) => void;
   setDay: (day: DayPreset) => void;
   setTst: (tst: number) => void;
@@ -46,6 +62,8 @@ interface AppState {
   select: (s: Selection) => void;
   setFocusBuilding: (b: number | null) => void;
   requestFly: (target: [number, number, number], distance: number) => void;
+  setMarker: (m: Marker | null) => void;
+  setRoute: (r: Route | null) => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -56,11 +74,15 @@ export const useApp = create<AppState>((set) => ({
   selection: null,
   focusBuilding: null,
   flyTo: null,
+  marker: null,
+  route: null,
   setMode: (mode) => set({ mode }),
   setDay: (day) => set({ day }),
   setTst: (tst) => set({ tst }),
   setPlaying: (playing) => set({ playing }),
-  select: (selection) => set({ selection, focusBuilding: null }),
+  select: (selection) => set({ selection, focusBuilding: null, route: null }),
   setFocusBuilding: (focusBuilding) => set({ focusBuilding }),
   requestFly: (target, distance) => set({ flyTo: { target, distance, nonce: Math.random() } }),
+  setMarker: (marker) => set({ marker }),
+  setRoute: (route) => set({ route }),
 }));
