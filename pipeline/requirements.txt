@@ -1,0 +1,6 @@
+# 数据管线依赖（Python 3.12+）
+pyogrio>=0.13
+shapely>=2.2
+pyproj>=3.8
+numpy>=2.0
+pvlib>=0.16
