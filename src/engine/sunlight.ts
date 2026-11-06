@@ -11,7 +11,13 @@ import { DoubleSide, Ray, Vector3 } from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import type { Solids } from './geometry';
 import { type WindowGrid, type WindowSample, windowSample } from './geometry';
-import { type CivilDate, sunDirectionEnu, sunPosition, trueSolarTimeToUtc } from './solar';
+import {
+  type CivilDate,
+  sunDirectionEnu,
+  sunPosition,
+  trueSolarTimeToUtc,
+  utcToBeijingMinutes,
+} from './solar';
 
 /** 一天里参与计算的时间带 */
 export interface DaySpec {
@@ -61,6 +67,11 @@ export class SunPath {
 
   utcAt(tst: number): number {
     return this.utcStart + (tst - this.day.startTst) * this.msPerTstMinute;
+  }
+
+  /** 真太阳时 → 北京时间（当日第几分钟） */
+  beijingAt(tst: number): number {
+    return utcToBeijingMinutes(this.utcAt(tst));
   }
 
   dirAt(tst: number): [number, number, number] {
