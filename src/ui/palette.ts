@@ -37,6 +37,5 @@ export const BIN_RGB: Uint8Array = Uint8Array.from(
 /** 时间轴上的状态色 */
 export const SPAN_COLOR = {
   lit: '#d06f32',
-  blocked: '#5c5a55',
-  away: '#d9d5cc',
+  unlit: '#cfcac0',
 } as const;

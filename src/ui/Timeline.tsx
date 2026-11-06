@@ -1,11 +1,34 @@
 import { formatClock } from '../app/format';
-import { AWAY, LIT, type Span, type SunPath } from '../engine/sunlight';
+import { LIT, type Span, type SunPath } from '../engine/sunlight';
 import { SPAN_COLOR } from './palette';
 
 const W = 300;
 const H = 26;
 
-/** 一天的照到/被挡/背光时段条：上方刻度为真太阳时，下方为北京时间 */
+interface MergedSpan {
+  from: number;
+  to: number;
+  lit: boolean;
+  focusBuilding: number | null;
+}
+
+function mergeSpans(spans: Span[]): MergedSpan[] {
+  const result: MergedSpan[] = [];
+  for (const s of spans) {
+    const lit = s.state === LIT;
+    const focus = s.state >= 0 ? s.state : null;
+    const prev = result[result.length - 1];
+    if (prev && prev.lit === lit) {
+      prev.to = s.to;
+      if (prev.focusBuilding !== focus) prev.focusBuilding = null;
+    } else {
+      result.push({ from: s.from, to: s.to, lit, focusBuilding: focus });
+    }
+  }
+  return result;
+}
+
+/** 日照时段条：有日照 / 无日照 */
 export function Timeline({
   spans,
   path,
@@ -20,6 +43,8 @@ export function Timeline({
   const hours: number[] = [];
   for (let h = Math.ceil(startTst / 60); h <= Math.floor(endTst / 60); h++) hours.push(h);
 
+  const merged = mergeSpans(spans);
+
   return (
     <figure className="timeline">
       <svg viewBox={`-16 -14 ${W + 32} ${H + 30}`} width="100%" role="img" aria-label="日照时段">
@@ -28,14 +53,9 @@ export function Timeline({
             {h}
           </text>
         ))}
-        {spans.map((s) => {
-          const color =
-            s.state === LIT
-              ? SPAN_COLOR.lit
-              : s.state === AWAY
-                ? SPAN_COLOR.away
-                : SPAN_COLOR.blocked;
-          const blocker = s.state >= 0;
+        {merged.map((s) => {
+          const color = s.lit ? SPAN_COLOR.lit : SPAN_COLOR.unlit;
+          const canFocus = s.focusBuilding !== null;
           return (
             <rect
               key={`${s.from}`}
@@ -45,12 +65,12 @@ export function Timeline({
               height={H}
               rx={2}
               fill={color}
-              onPointerEnter={blocker ? () => onFocus(s.state) : undefined}
-              onPointerLeave={blocker ? () => onFocus(null) : undefined}
+              onPointerEnter={canFocus ? () => onFocus(s.focusBuilding) : undefined}
+              onPointerLeave={canFocus ? () => onFocus(null) : undefined}
             >
               <title>
                 {formatClock(path.beijingAt(s.from))}–{formatClock(path.beijingAt(s.to))}
-                {s.state === LIT ? ' 照到' : s.state === AWAY ? ' 太阳在墙背面' : ' 被挡'}
+                {s.lit ? ' 有日照' : ' 无日照'}
               </title>
             </rect>
           );
@@ -64,17 +84,12 @@ export function Timeline({
       <figcaption>
         <span>
           <i style={{ background: SPAN_COLOR.lit }} />
-          照到
+          有日照
         </span>
         <span>
-          <i style={{ background: SPAN_COLOR.blocked }} />
-          被挡
+          <i style={{ background: SPAN_COLOR.unlit }} />
+          无日照
         </span>
-        <span>
-          <i style={{ background: SPAN_COLOR.away }} />
-          太阳在墙背面
-        </span>
-        <span className="muted">上：真太阳时 · 下：北京时间</span>
       </figcaption>
     </figure>
   );
