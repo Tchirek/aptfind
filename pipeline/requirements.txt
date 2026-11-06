@@ -3,4 +3,6 @@ pyogrio>=0.13
 shapely>=2.2
 pyproj>=3.8
 numpy>=2.0
+scipy>=1.14
+rasterio>=1.4
 pvlib>=0.16
