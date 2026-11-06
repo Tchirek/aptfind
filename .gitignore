@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+coverage/
+# 数据管线的本地环境与原始数据（原始数据不入库，见 pipeline/README.md）
+pipeline/.venv/
+pipeline/raw/
+__pycache__/
