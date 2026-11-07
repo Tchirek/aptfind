@@ -47,7 +47,16 @@ const district = {
     { name: '狮子山地铁站B口', category: 'metro', x: 101, y: 101 },
     { name: '红旗连锁', category: 'grocery', x: 300, y: 0 },
   ],
-  roads: [{ name: '静安路', cls: 2, bridge: false, points: Float64Array.of(0, 0, 100, 0) }],
+  roads: [
+    {
+      name: '静安路',
+      cls: 2,
+      bridge: false,
+      lanes: null,
+      oneway: 0,
+      points: Float64Array.of(0, 0, 100, 0),
+    },
+  ],
 } as unknown as District;
 
 describe('search', () => {

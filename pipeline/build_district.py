@@ -756,8 +756,19 @@ def main() -> None:
     roads = []
     for wid, line, tags in road_lines:
         hw = tags["highway"]
-        roads.append({"n": road_names.get(wid), "c": ROAD_CLASSES[hw], "b": 1 if tags.get("bridge") == "yes" else 0,
-                      "p": line_dm(line.simplify(0.5).coords)})
+        road = {"n": road_names.get(wid), "c": ROAD_CLASSES[hw], "b": 1 if tags.get("bridge") == "yes" else 0,
+                "p": line_dm(line.simplify(0.5).coords)}
+        # 车道数与单行，车流模型用（单行方向顺着折线为 1，逆着为 -1）
+        try:
+            road["l"] = int(float(tags["lanes"]))
+        except (KeyError, ValueError):
+            pass
+        ow = tags.get("oneway")
+        if ow in ("yes", "true", "1") or hw in ("motorway", "motorway_link") or tags.get("junction") == "roundabout":
+            road["o"] = 1
+        elif ow == "-1":
+            road["o"] = -1
+        roads.append(road)
 
     # ---------------- 压在路面上的建筑
     # 地面按道路等级画出路面（宽度与前端 groundTexture 的 ROAD_WIDTH 一致）。CBMF 偶尔把路边棚子、

@@ -60,6 +60,10 @@ export interface Road {
   /** 0 快速路/高架 · 1 主干道 · 2 次干道 · 3 支路 · 4 小区道路 · 5 内部通道 */
   cls: number;
   bridge: boolean;
+  /** OSM 的车道数（整条路，单行路即单向车道数），没标为 null */
+  lanes: number | null;
+  /** 单行：1 顺着折线方向，−1 逆着，0 双向 */
+  oneway: -1 | 0 | 1;
   points: Float64Array;
 }
 
@@ -163,7 +167,7 @@ interface DistrictJson {
     n?: string;
     core?: 1;
   }[];
-  roads: { n: string | null; c: number; b: 0 | 1; p: number[] }[];
+  roads: { n: string | null; c: number; b: 0 | 1; l?: number; o?: -1 | 1; p: number[] }[];
   water: ({ r: number[] } | { l: number[]; w: number })[];
   pois: { n: string; c: PoiCategory; p: [number, number] }[];
 }
@@ -214,6 +218,8 @@ export function decodeDistrict(json: DistrictJson): District {
       name: r.n,
       cls: r.c,
       bridge: r.b === 1,
+      lanes: r.l ?? null,
+      oneway: r.o ?? 0,
       points: decode(r.p),
     })),
     water: json.water.map((w) =>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { District, Terrain } from './district';
+import type { District, Road, Terrain } from './district';
 import { distanceToPolyline, greenDistance, nearestRoad, slopePercent } from './site';
 
 function terrain(z: (x: number, y: number) => number): Terrain {
@@ -45,9 +45,23 @@ describe('distanceToPolyline', () => {
 });
 
 describe('nearestRoad', () => {
-  const roads = [
-    { name: '主干道', cls: 1, bridge: false, points: Float64Array.from([0, 0, 200, 0]) },
-    { name: '支路', cls: 3, bridge: false, points: Float64Array.from([50, 20, 50, 100]) },
+  const roads: Road[] = [
+    {
+      name: '主干道',
+      cls: 1,
+      bridge: false,
+      lanes: null,
+      oneway: 0,
+      points: Float64Array.from([0, 0, 200, 0]),
+    },
+    {
+      name: '支路',
+      cls: 3,
+      bridge: false,
+      lanes: null,
+      oneway: 0,
+      points: Float64Array.from([50, 20, 50, 100]),
+    },
   ];
 
   it('只考虑主干道等级，忽略更远的支路', () => {
