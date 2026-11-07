@@ -6,6 +6,7 @@
  *
  * 在浏览器控制台里调用：
  *   await jgCollect.regeo()   逆地理编码：每栋楼所在的 AOI（小区/校园）与附近 POI
+ *   await jgCollect.roads()   逆地理编码：OSM 里没有名字的道路，沿线样点附近的道路名
  *   await jgCollect.pois()    按类别搜索片区内的设施 POI
  */
 
@@ -102,6 +103,58 @@ async function regeo(radius = 60): Promise<number> {
   }
   await save('regeo', out);
   log(`逆地理编码完成：${out.length} 个点`);
+  return out.length;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: 高德 Geocoder 实例
+function getAddress(geocoder: any, lnglats: [number, number][]): Promise<any> {
+  return new Promise((resolve, reject) => {
+    // biome-ignore lint/suspicious/noExplicitAny: 高德回调结果
+    geocoder.getAddress(lnglats, (status: string, r: any) =>
+      status === 'complete'
+        ? resolve(r)
+        : reject(new Error(`regeo ${status}: ${JSON.stringify(r)}`)),
+    );
+  });
+}
+
+/** 道路样点：每批 20 个，记下附近道路的名称、距离与方位，供管线给无名道路投票 */
+async function roads(radius = 60): Promise<number> {
+  const input = (await (await fetch('/pipeline/raw/amap/road-points.json')).json()) as InputPoint[];
+  const geocoder = new window.AMap.Geocoder({ radius, extensions: 'all', batch: true });
+  const out: unknown[] = [];
+  for (let i = 0; i < input.length; i += 20) {
+    const batch = input.slice(i, i + 20);
+    const lnglats = batch.map((p) => wgs84ToGcj02(p.lon, p.lat));
+    // biome-ignore lint/suspicious/noExplicitAny: 高德回调结果
+    let result: any;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        result = await getAddress(geocoder, lnglats);
+        break;
+      } catch (e) {
+        if (attempt >= 6 || !String((e as Error).message).includes('QPS')) throw e;
+        await sleep(1000 * 2 ** attempt);
+      }
+    }
+    const list = result.regeocodes ?? [result.regeocode];
+    batch.forEach((p, k) => {
+      const r = list[k];
+      out.push({
+        id: p.id,
+        roads: (r?.roads ?? []).map((x: Record<string, unknown>) => ({
+          name: x.name,
+          distance: Number(x.distance),
+          direction: x.direction,
+        })),
+        street: r?.addressComponent?.street ?? '',
+      });
+    });
+    log(`道路样点 ${Math.min(i + 20, input.length)} / ${input.length}`);
+    await sleep(120);
+  }
+  await save('roads', out);
+  log(`道路样点完成：${out.length} 个`);
   return out.length;
 }
 
@@ -234,7 +287,7 @@ async function campusNames(): Promise<number> {
   return found.size;
 }
 
-const api = { regeo, pois, campusNames };
+const api = { regeo, roads, pois, campusNames };
 
 loadAMap()
   .then(() => {

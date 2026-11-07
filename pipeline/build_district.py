@@ -322,6 +322,59 @@ def derived_boundary(polys: list[Polygon]) -> list[Polygon]:
 # ---------------------------------------------------------------- main
 
 
+# 高德逆地理编码给出的"附近道路"离取样点不超过这么远，才认为就是这条路（米，按道路等级）
+ROAD_MATCH_DISTANCE = {0: 25, 1: 25, 2: 22, 3: 18, 4: 14, 5: 10}
+
+
+def name_roads(
+    road_lines: list[tuple[int, LineString, dict]], amap_roads: dict[str, list[dict]]
+) -> tuple[dict[int, str], list[dict]]:
+    """OSM 有名字的用 OSM 的；没有的用高德逆地理编码的附近道路投票补上。
+
+    每条无名道路沿线取 1–5 个样点。一个样点认定某个路名，须同时满足：
+    高德给出的道路离样点足够近（ROAD_MATCH_DISTANCE）；附近没有同名的 OSM 道路比它更近
+    （否则高德指的是旁边那条已有名字的路，比如主干道旁的辅路、小区通道）。
+    过半样点认定同一个名字才采用。返回 (way id → 路名, 待采集的样点)。
+    """
+    names: dict[int, str] = {}
+    named = [(line, tags["name"]) for _, line, tags in road_lines if tags.get("name")]
+    tree = STRtree([line for line, _ in named]) if named else None
+    points: list[dict] = []
+    adopted = 0
+    for wid, line, tags in road_lines:
+        if tags.get("name"):
+            names[wid] = tags["name"]
+            continue
+        n = max(1, min(5, round(line.length / 60)))
+        samples = [line.interpolate((k + 0.5) / n, normalized=True) for k in range(n)]
+        votes: Counter[str] = Counter()
+        limit = ROAD_MATCH_DISTANCE[ROAD_CLASSES[tags["highway"]]]
+        for k, pt in enumerate(samples):
+            lon, lat = TO_WGS.transform(pt.x, pt.y)
+            pid = f"{wid}:{k}"
+            points.append({"id": pid, "lon": round(lon, 7), "lat": round(lat, 7)})
+            for r in amap_roads.get(pid, []):
+                name = r.get("name") or ""
+                d = float(r.get("distance") or 1e9)
+                if not name or d > limit:
+                    continue
+                if tree is not None:
+                    near = [named[i] for i in tree.query(pt.buffer(d + 8))]
+                    if any(nm == name and ln.distance(pt) <= d + 8 for ln, nm in near):
+                        continue
+                votes[name] += 1
+                break  # 每个样点只取最近的一条
+        if votes:
+            name, count = votes.most_common(1)[0]
+            if count * 2 > n or (n == 1 and count == 1):
+                names[wid] = name
+                adopted += 1
+    if amap_roads:
+        unnamed = sum(1 for wid, _, _ in road_lines if wid not in names)
+        print(f"道路：高德补名 {adopted} 条，仍无名 {unnamed} 条（共 {len(road_lines)} 条）", file=sys.stderr)
+    return names, points
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cbmf", required=True, type=Path, help="CBMF 四川 Sichuan.gdb 目录")
@@ -612,7 +665,7 @@ def main() -> None:
     net = network.build_network(elements, xy_local, (minx - 400, miny - 400, maxx + 400, maxy + 400))
 
     # ---------------- 道路
-    roads = []
+    road_lines: list[tuple[int, LineString, dict]] = []
     for el in elements:
         tags = el.get("tags", {})
         hw = tags.get("highway")
@@ -621,7 +674,12 @@ def main() -> None:
         line = to_local(LineString(way_coords(el)))
         if not line.intersects(outer_local.buffer(200)):
             continue
-        roads.append({"n": tags.get("name"), "c": ROAD_CLASSES[hw], "b": 1 if tags.get("bridge") == "yes" else 0,
+        road_lines.append((el["id"], line, tags))
+    road_names, road_points = name_roads(road_lines, amap.load_roads(AMAP_RAW))
+    roads = []
+    for wid, line, tags in road_lines:
+        hw = tags["highway"]
+        roads.append({"n": road_names.get(wid), "c": ROAD_CLASSES[hw], "b": 1 if tags.get("bridge") == "yes" else 0,
                       "p": line_dm(line.simplify(0.5).coords)})
 
     water = [{"r": ring_dm(p.simplify(1.0).exterior.coords)} for p in water_polys]
@@ -699,6 +757,8 @@ def main() -> None:
             lon, lat = TO_WGS.transform(c.x, c.y)
             pts.append({"id": b["id"], "lon": round(lon, 7), "lat": round(lat, 7)})
     (AMAP_RAW / "input-points.json").write_text(json.dumps(pts), encoding="utf-8")
+    # 高德采集的输入：OSM 里没有名字的道路，沿线取样点
+    (AMAP_RAW / "road-points.json").write_text(json.dumps(road_points), encoding="utf-8")
 
     # 待实地核验：核心区里最高的住宅楼
     todo = sorted((b for b in buildings if b["core"] and b["cls"] == "R" and b["src"] == "cbmf"), key=lambda b: -b["height"])[:40]

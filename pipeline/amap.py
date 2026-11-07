@@ -134,6 +134,18 @@ def load_regeo(raw: Path) -> dict[str, dict]:
     return {r["id"]: r for r in json.loads(f.read_text(encoding="utf-8"))}
 
 
+def load_roads(raw: Path) -> dict[str, list[dict]]:
+    """道路样点的逆地理编码结果：样点 id → 附近道路 [{name, distance, direction}]，按距离从近到远"""
+    f = raw / "roads.json"
+    if not f.exists():
+        return {}
+    out: dict[str, list[dict]] = {}
+    for r in json.loads(f.read_text(encoding="utf-8")):
+        roads = [x for x in r.get("roads", []) if text(x.get("name"))]
+        out[r["id"]] = sorted(roads, key=lambda x: float(x.get("distance") or 1e9))
+    return out
+
+
 def text(v) -> str:
     """高德在缺值时会给空数组，统一成字符串"""
     return v if isinstance(v, str) else ""
