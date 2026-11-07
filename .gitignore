@@ -7,3 +7,6 @@ coverage/
 pipeline/.venv/
 pipeline/raw/
 __pycache__/
+
+# Qoder Sites 部署描述（本机绑定）
+.*.qoder.site
