@@ -12,8 +12,6 @@ import { Ground } from './Ground';
 import { Overlays } from './Overlays';
 import { Sun } from './Sun';
 
-export const BACKGROUND = '#f3f2ee';
-
 export function Scene({ data }: { data: SceneData }) {
   const select = useApp((s) => s.select);
   return (
@@ -26,8 +24,6 @@ export function Scene({ data }: { data: SceneData }) {
         if (e.type === 'click') select(null);
       }}
     >
-      <color attach="background" args={[BACKGROUND]} />
-      <fog attach="fog" args={[BACKGROUND, 3200, 9000]} />
       <Sun />
       <group rotation-x={ENU_ROTATION_X}>
         <Ground district={data.district} />
