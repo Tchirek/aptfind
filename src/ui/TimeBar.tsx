@@ -11,6 +11,7 @@ import {
   upcomingTerm,
 } from '../app/time';
 import './timebar.css';
+import { SHEET_QUERY, useMedia } from './useMedia';
 
 const PLAY_SPEED = 40;
 
@@ -55,24 +56,26 @@ function NowIcon() {
   );
 }
 
-/** 地平线上半个太阳：节气 */
-function TermsIcon() {
+/** 太阳：白天 */
+function SunIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="3" fill="currentColor" />
       <path
-        d="M3.5 11a4.5 4.5 0 0 1 9 0"
-        fill="none"
+        d="M8 1.2v1.8M8 13v1.8M1.2 8H3M13 8h1.8M3.2 3.2l1.3 1.3M11.5 11.5l1.3 1.3M3.2 12.8l1.3-1.3M11.5 4.5l1.3-1.3"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.4"
         strokeLinecap="round"
       />
-      <path
-        d="M1.5 11h13M8 2.5v1.6M3.2 4.6l1.1 1.1M12.8 4.6l-1.1 1.1M8 13.5h0"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+    </svg>
+  );
+}
+
+/** 月牙：夜里 */
+function MoonIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M10.8 2.2A6 6 0 1 0 13.8 11 5 5 0 0 1 10.8 2.2Z" fill="currentColor" />
     </svg>
   );
 }
@@ -84,8 +87,12 @@ export function TimeBar() {
   const live = useApp((s) => s.live);
   const playing = useApp((s) => s.playing);
   const { setDate, setMinute, setPlaying, goLive, syncNow } = useApp.getState();
-  // 手机上节气默认收起，由日期旁的图标唤出（桌面上一直显示，这个状态不起作用）
-  const [termsOpen, setTermsOpen] = useState(false);
+  // 竖放的手机上整块时间面板默认收起，地图右下角的浮动按钮唤出（学 Google 地图的做法）；
+  // 桌面上一直显示，这个状态不起作用
+  const compact = useMedia(SHEET_QUERY);
+  const [open, setOpen] = useState(false);
+  const shown = !compact || open;
+  const swipe = useRef<number | null>(null);
 
   const { sunrise, sunset } = dayTimes(date);
 
@@ -147,106 +154,131 @@ export function TimeBar() {
     `#d6dee9 ${sunsetPct}%, #d6dee9 100%)`;
 
   return (
-    <div className="panel timebar" ref={ref}>
-      <div className="tb-date-row">
-        <input
-          type="date"
-          className="tb-date-input"
-          value={dateToIso(date)}
-          onChange={(e) => {
-            const d = isoToDate(e.target.value);
-            if (d) setDate(d);
-          }}
-          aria-label="日期"
-        />
+    <>
+      {compact && (
         <button
           type="button"
-          className={`tb-terms-btn${termsOpen ? ' on' : ''}`}
-          onClick={() => setTermsOpen(!termsOpen)}
-          aria-label="节气"
-          aria-expanded={termsOpen}
+          className={`tb-fab${shown ? ' away' : ''}`}
+          onClick={() => setOpen(true)}
+          aria-label="时间与日期"
+          aria-expanded={open}
         >
-          <TermsIcon />
+          {minute >= sunrise && minute <= sunset ? <SunIcon /> : <MoonIcon />}
+          <span className="mono">{formatClock(minute)}</span>
+          {!sameDate(date, nowBeijing().date) && (
+            <small>
+              {date.month}/{date.day}
+            </small>
+          )}
         </button>
-        <fieldset className={`tb-terms${termsOpen ? ' open' : ''}`} aria-label="节气">
-          {TERM_PICKS.map((term) => {
-            const d = upcomingTerm(term, nowBeijing().date);
-            const selected = sameDate(date, d);
-            return (
+      )}
+      <div className={`panel timebar${shown ? '' : ' away'}`} ref={ref} inert={!shown}>
+        {compact && (
+          <button
+            type="button"
+            className="tb-grip"
+            aria-label="收起"
+            onClick={() => setOpen(false)}
+            onPointerDown={(e) => {
+              swipe.current = e.clientY;
+            }}
+            onPointerUp={(e) => {
+              // 往下一划也收起
+              if (swipe.current !== null && e.clientY - swipe.current > 24) setOpen(false);
+              swipe.current = null;
+            }}
+          >
+            <i />
+          </button>
+        )}
+        <div className="tb-date-row">
+          <input
+            type="date"
+            className="tb-date-input"
+            value={dateToIso(date)}
+            onChange={(e) => {
+              const d = isoToDate(e.target.value);
+              if (d) setDate(d);
+            }}
+            aria-label="日期"
+          />
+          <fieldset className="tb-terms" aria-label="节气">
+            {TERM_PICKS.map((term) => {
+              const d = upcomingTerm(term, nowBeijing().date);
+              const selected = sameDate(date, d);
+              return (
+                <button
+                  type="button"
+                  key={term}
+                  className={`tb-term${selected ? ' on' : ''}`}
+                  aria-pressed={selected}
+                  onClick={() => setDate(d)}
+                >
+                  {term}
+                  <small>
+                    {d.month}/{d.day}
+                  </small>
+                </button>
+              );
+            })}
+          </fieldset>
+        </div>
+
+        <div className="tb-time-row">
+          <button
+            type="button"
+            className="tb-play"
+            onClick={() => setPlaying(!playing)}
+            aria-label={playing ? '暂停' : '播放'}
+          >
+            {playing ? <PauseIcon /> : <PlayIcon />}
+          </button>
+
+          <div className="tb-slider-wrap">
+            <input
+              type="range"
+              className="tb-range"
+              style={{ '--track': trackGradient } as CSSProperties}
+              min={0}
+              max={1439}
+              step={1}
+              value={Math.round(minute)}
+              onChange={(e) => {
+                setPlaying(false);
+                setMinute(Number(e.target.value));
+              }}
+              aria-label="时刻"
+            />
+            <div className="tb-ticks">
+              <span>0</span>
+              <span>6</span>
+              <span>12</span>
+              <span>18</span>
+              <span>24</span>
+            </div>
+          </div>
+
+          <div className="tb-readout">
+            <div className="tb-clock">
+              {/* 位置一直留着，手动改过时间才出现，不撑高面板 */}
               <button
                 type="button"
-                key={term}
-                className={`tb-term${selected ? ' on' : ''}`}
-                aria-pressed={selected}
-                onClick={() => {
-                  setDate(d);
-                  setTermsOpen(false);
-                }}
+                className="tb-go-live"
+                onClick={goLive}
+                aria-label="回到现在"
+                title="回到现在"
+                disabled={live}
               >
-                {term}
-                <small>
-                  {d.month}/{d.day}
-                </small>
+                <NowIcon />
               </button>
-            );
-          })}
-        </fieldset>
-      </div>
-
-      <div className="tb-time-row">
-        <button
-          type="button"
-          className="tb-play"
-          onClick={() => setPlaying(!playing)}
-          aria-label={playing ? '暂停' : '播放'}
-        >
-          {playing ? <PauseIcon /> : <PlayIcon />}
-        </button>
-
-        <div className="tb-slider-wrap">
-          <input
-            type="range"
-            className="tb-range"
-            style={{ '--track': trackGradient } as CSSProperties}
-            min={0}
-            max={1439}
-            step={1}
-            value={Math.round(minute)}
-            onChange={(e) => {
-              setPlaying(false);
-              setMinute(Number(e.target.value));
-            }}
-            aria-label="时刻"
-          />
-          <div className="tb-ticks">
-            <span>0</span>
-            <span>6</span>
-            <span>12</span>
-            <span>18</span>
-            <span>24</span>
-          </div>
-        </div>
-
-        <div className="tb-readout">
-          <div className="tb-clock">
-            {/* 位置一直留着，手动改过时间才出现，不撑高面板 */}
-            <button
-              type="button"
-              className="tb-go-live"
-              onClick={goLive}
-              aria-label="回到现在"
-              title="回到现在"
-              disabled={live}
-            >
-              <NowIcon />
-            </button>
-            <span className="mono tb-clock-time">{formatClock(minute)}</span>
-          </div>
-          <div className="tb-sun-info">
-            日出 {formatClock(sunrise)} · 日落 {formatClock(sunset)}
+              <span className="mono tb-clock-time">{formatClock(minute)}</span>
+            </div>
+            <div className="tb-sun-info">
+              日出 {formatClock(sunrise)} · 日落 {formatClock(sunset)}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
