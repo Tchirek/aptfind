@@ -273,14 +273,30 @@ export function scoreLivability(facts: LivabilityFacts): Livability {
   return { total, tone, label, dimensions, penalties, summary: summarize(dimensions, penalties) };
 }
 
+const STRONG: Record<Dimension['key'], string> = {
+  light: '采光好',
+  transit: '交通方便',
+  amenity: '配套齐全',
+  environment: '环境开阔',
+  age: '楼龄新',
+};
+
+const WEAK: Record<Dimension['key'], string> = {
+  light: '采光偏弱',
+  transit: '交通偏弱',
+  amenity: '配套偏少',
+  environment: '环境一般',
+  age: '楼龄偏老',
+};
+
 function summarize(dimensions: Dimension[], penalties: Penalty[]): string {
   const ranked = [...dimensions].sort((a, b) => b.score / b.max - a.score / a.max);
   const best = ranked[0];
   const worst = ranked[ranked.length - 1];
   if (!best || !worst) return '';
   const part: string[] = [];
-  if (best.score / best.max >= 0.75) part.push(`${best.label}好`);
-  if (worst !== best && worst.score / worst.max < 0.45) part.push(`${worst.label}偏弱`);
+  if (best.score / best.max >= 0.75) part.push(STRONG[best.key]);
+  if (worst !== best && worst.score / worst.max < 0.45) part.push(WEAK[worst.key]);
   if (penalties.length) part.push(penalties.map((p) => p.label).join('、'));
   if (!part.length) return '各项均衡';
   return part.join('，');
