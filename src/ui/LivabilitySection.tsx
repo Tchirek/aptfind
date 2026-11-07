@@ -48,7 +48,6 @@ export function LivabilitySection({ building }: { building: number }) {
           ))}
         </ul>
       )}
-      <p className="liv-note">按日照、步行、视野、地形与楼龄的固定规则算出，不含主观判断。</p>
     </section>
   );
 }

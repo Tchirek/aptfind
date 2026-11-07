@@ -691,12 +691,6 @@ button {
 .liv-pen .liv-detail {
   color: var(--ink-3);
 }
-.liv-note {
-  margin: 8px 0 0;
-  font-size: 11px;
-  color: var(--ink-3);
-  line-height: 1.5;
-}
 
 /* 地价 */
 .price-head {

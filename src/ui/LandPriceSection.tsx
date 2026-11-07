@@ -3,7 +3,8 @@
  *
  * 成都市中心城区住宅用地基准地价（楼面地价、容积率 2.0，2024-12-01 起执行）：
  * Ⅰ 13400、Ⅱ 11100、Ⅲ 8750、Ⅳ 6900、Ⅴ 4960、Ⅵ 3350 元/㎡。
- * 狮子山片区在级别图上跨Ⅱ、Ⅲ级一带，所以给区间而不是单值。
+ * 片区所在级别取自 2021 版级别图（狮子山一带跨Ⅱ、Ⅲ级）；2024 版级别图未取得，
+ * 多地 2024 年有升级，界面上注明级别的出处，不把两版混成一个确定的结论。
  *
  * 本地成交：四川师大站 TOD 两宗地 2020-11 成交楼面价 6400、9100 元/㎡。
  * 成交价受地块条件、配建与市场行情影响，与基准地价不是一回事。
@@ -18,7 +19,7 @@ const GRADES = [
   { grade: 'Ⅵ', price: 3350 },
 ] as const;
 
-/** 片区所在的级别区间（2024 版级别图） */
+/** 片区所在的级别区间（按 2021 版级别图） */
 const LOCAL = new Set(['Ⅱ', 'Ⅲ']);
 
 const TOD_DEALS = [
@@ -37,7 +38,7 @@ export function LandPriceSection() {
         <span className="price-value mono">8,750–11,100</span>
         <span className="price-unit">元/㎡ 楼面价</span>
       </div>
-      <p className="price-sub">Ⅱ–Ⅲ 级基准地价 · 2024 年成都市中心城区</p>
+      <p className="price-sub">Ⅱ–Ⅲ 级住宅基准地价 · 2024 版</p>
       <ul className="price-scale" aria-label="住宅用地基准地价（元/平方米）">
         {GRADES.map((g) => {
           const on = LOCAL.has(g.grade);
