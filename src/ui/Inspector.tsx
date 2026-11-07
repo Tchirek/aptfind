@@ -9,6 +9,7 @@ import { floorsOf } from '../engine/geometry';
 import { AWAY, LIT, type Span, SunPath, TERRAIN } from '../engine/sunlight';
 import { AccessSection } from './AccessSection';
 import { THRESHOLD_MINUTES, warmSpanFor } from './palette';
+import { ReachSection } from './ReachSection';
 import { SunRamp } from './SunRamp';
 import { Timeline } from './Timeline';
 import { ViewSection } from './ViewSection';
@@ -211,6 +212,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
       )}
 
       <ViewSection data={data} index={index} />
+      <ReachSection building={b.index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
 
       <section className="note">
@@ -249,6 +251,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
           </p>
         </section>
       )}
+      <ReachSection building={index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
     </>
   );
