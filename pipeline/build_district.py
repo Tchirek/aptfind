@@ -141,7 +141,7 @@ def overpass(query: str, cache: Path) -> dict:
     body = urllib.parse.urlencode({"data": query}).encode()
     for attempt in range(3):
         for endpoint in OVERPASS_ENDPOINTS:
-            req = urllib.request.Request(endpoint, data=body, headers={"User-Agent": "jianguang-pipeline/0.2"})
+            req = urllib.request.Request(endpoint, data=body, headers={"User-Agent": "aptfind-pipeline/0.3"})
             try:
                 with urllib.request.urlopen(req, timeout=240) as resp:
                     data = json.load(resp)

@@ -43,7 +43,7 @@ function Main() {
 function Splash({ text }: { text: string }) {
   return (
     <div className="splash">
-      <h1>见光</h1>
+      <h1>aptfind</h1>
       <p>{text}</p>
     </div>
   );
