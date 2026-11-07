@@ -10,42 +10,44 @@
   background: var(--panel);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -6px 28px rgba(15, 30, 51, 0.14);
-  transition: transform 0.36s cubic-bezier(0.22, 0.9, 0.3, 1);
+  transition: transform 0.34s cubic-bezier(0.22, 0.9, 0.3, 1);
   will-change: transform;
+  /* 抽屉里的排版变化不牵动页面其他部分 */
+  contain: layout paint;
   padding-bottom: env(safe-area-inset-bottom);
+  touch-action: none;
 }
 .sheet.dragging {
   transition: none;
 }
+/* 把手区：展开时从这里拖 */
 .sheet-grip {
   position: relative;
   flex-shrink: 0;
-  padding: 8px 52px 6px 18px;
-  touch-action: none;
+  height: 22px;
   cursor: grab;
 }
 .sheet-handle {
+  position: absolute;
+  top: 8px;
+  left: 50%;
   width: 38px;
   height: 4px;
-  margin: 0 auto 10px;
+  margin-left: -19px;
   border-radius: 2px;
   background: #c5d0de;
-  transform: translateX(17px);
 }
 .sheet-grip .close {
-  top: 14px;
+  top: 10px;
   right: 10px;
-  z-index: 1;
+  z-index: 2;
   background: rgba(255, 255, 255, 0.86);
   border-radius: 50%;
-}
-.sheet-grip .inspector-head {
-  margin: 0;
 }
 .sheet-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   padding: 0 18px 24px;
   scrollbar-width: none;
@@ -53,16 +55,24 @@
 .sheet-body::-webkit-scrollbar {
   display: none;
 }
-/* 收起时正文不可滚、不抢触摸，也不从标题下面露出一截 */
-.sheet-body {
-  transition: opacity 0.25s ease;
+/* 展开后正文才能滚；收起时停在标题处 */
+.sheet.full .sheet-body {
+  overflow-y: auto;
+  touch-action: pan-y;
 }
-.sheet.peek .sheet-body,
-.sheet.hidden .sheet-body {
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0;
+/* 给关闭键让位：只让文字让，题图照样铺满 */
+.sheet .inspector-head .eyebrow,
+.sheet .inspector-head h2,
+.sheet .inspector-head .sub {
+  padding-right: 34px;
 }
 .sheet .inspector-head h2 {
   font-size: 18px;
+}
+/* 题图：正文的第一块，铺满抽屉宽度，往下看时随正文滚走 */
+.sheet .head-photo {
+  width: calc(100% + 36px);
+  margin: 0 -18px 12px;
+  aspect-ratio: 16 / 10;
+  border-radius: 0;
 }

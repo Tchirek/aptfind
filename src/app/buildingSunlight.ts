@@ -22,6 +22,8 @@ export interface BuildingSunlight {
 const cache = new Map<string, Float32Array>();
 const MAX_CACHE = 24;
 const FRAME_BUDGET_MS = 8;
+/** 进度写进 store 的最短间隔：每片都写会让详情面板跟着每帧重渲染，手机上抽屉动画会卡 */
+const PUBLISH_MS = 80;
 
 /** 不渲染任何东西：跟着选中的楼与日期计算，结果写进 store.sunlight */
 export function SunlightController({ data }: { data: SceneData }): null {
@@ -56,6 +58,7 @@ export function SunlightController({ data }: { data: SceneData }): null {
     let alive = true;
     let timer = 0;
     let next = 0;
+    let published = 0;
     getEngine().then((engine) => {
       if (!alive) return;
       const path = new SunPath(isoDate(iso));
@@ -67,7 +70,11 @@ export function SunlightController({ data }: { data: SceneData }): null {
           minutes[l] = engine.trace(data.grid, start + l, path);
           next++;
         }
-        setState({ building, start, minutes, done: next });
+        const now = performance.now();
+        if (next >= n || now - published >= PUBLISH_MS) {
+          published = now;
+          setState({ building, start, minutes, done: next });
+        }
         if (next < n) {
           // 用定时器而不是 requestAnimationFrame：页面在后台时也能算完
           timer = window.setTimeout(tick, 0);
