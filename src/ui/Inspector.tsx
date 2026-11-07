@@ -8,6 +8,8 @@ import { type Building, CLASS_LABEL, type District } from '../engine/district';
 import { floorsOf } from '../engine/geometry';
 import { AWAY, LIT, type Span, SunPath, TERRAIN } from '../engine/sunlight';
 import { AccessSection } from './AccessSection';
+import { LandPriceSection } from './LandPriceSection';
+import { LivabilitySection } from './LivabilitySection';
 import { THRESHOLD_MINUTES, warmSpanFor } from './palette';
 import { ReachSection } from './ReachSection';
 import { SunRamp } from './SunRamp';
@@ -214,6 +216,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
       <ViewSection data={data} index={index} />
       <ReachSection building={b.index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
+      <LandPriceSection />
 
       <section className="note">
         <p>{heightNote(b)}</p>
@@ -251,6 +254,8 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
           </p>
         </section>
       )}
+      <LivabilitySection building={index} />
+      <LandPriceSection />
       <ReachSection building={index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
     </>
@@ -295,6 +300,7 @@ function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
         </section>
       )}
       <AccessSection ring={largest} />
+      <LandPriceSection />
     </>
   );
 }

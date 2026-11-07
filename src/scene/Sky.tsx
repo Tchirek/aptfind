@@ -162,6 +162,8 @@ export function Sky() {
 
   const lut = useRef({ data: new Float32Array(LUT_W * LUT_H * 4), sun: [0, 0, -2], at: 0 });
   const pending = useRef(true);
+  // sunEnu 只是"太阳动了"的信号，查表在 useFrame 里按限频重算
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 依赖即触发条件
   useEffect(() => {
     pending.current = true;
   }, [sunEnu]);

@@ -512,3 +512,183 @@ button {
   stroke: var(--ink);
   stroke-width: 1.5;
 }
+
+/* 宜居评分 */
+.liv-loading {
+  font-size: 12px;
+}
+.liv-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.liv-score {
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.liv-grade {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.liv-grade.good {
+  color: var(--good);
+  border-color: #c4dfc4;
+  background: #eef7ee;
+}
+.liv-grade.fair {
+  color: #8a5a10;
+  border-color: #e6d5b4;
+  background: #fbf4e7;
+}
+.liv-grade.poor {
+  color: var(--bad);
+  border-color: #e8c6c4;
+  background: #fbeeed;
+}
+.liv-sum {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.liv-dims {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.liv-dims li {
+  display: grid;
+  grid-template-columns: 58px 1fr 42px;
+  align-items: center;
+  gap: 3px 8px;
+  font-size: 13px;
+}
+.liv-name {
+  color: var(--ink-2);
+}
+.liv-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #e6e3dc;
+  overflow: hidden;
+}
+.liv-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ink-2);
+}
+.liv-pts {
+  text-align: right;
+}
+.liv-pts small {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.liv-detail {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+.liv-pen {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid #ebe8e2;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+.liv-pen li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  color: var(--bad);
+}
+.liv-pen .liv-detail {
+  color: var(--ink-3);
+}
+.liv-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+/* 地价 */
+.price-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.price-value {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.price-unit {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.price-sub {
+  margin: 2px 0 10px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.price-scale {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 66px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  align-items: end;
+}
+.price-scale li {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  gap: 2px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.price-bar {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+.price-bar i {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: #dcd8cf;
+}
+.price-scale li.on .price-bar i {
+  background: var(--ink-2);
+}
+.price-grade {
+  font-size: 10px;
+}
+.price-num {
+  font-size: 10px;
+}
+.price-scale li.on .price-grade,
+.price-scale li.on .price-num {
+  color: var(--ink);
+}
+.price-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}

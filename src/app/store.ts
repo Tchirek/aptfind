@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { WindowGrid } from '../engine/geometry';
 import type { CivilDate } from '../engine/solar';
 import type { BuildingSunlight } from './buildingSunlight';
+import type { LivabilityResult } from './livability';
 import type { Reach } from './reach';
 import { nowBeijing } from './time';
 
@@ -56,6 +57,8 @@ interface AppState {
   sunlight: BuildingSunlight | null;
   /** 选中楼的可达范围（15 分钟步行、30 分钟步行 + 地铁） */
   reach: Reach | null;
+  /** 选中楼的宜居评分 */
+  livability: LivabilityResult | null;
   setDate: (date: CivilDate) => void;
   setMinute: (minute: number) => void;
   /** 回到现在，并开始跟随 */
@@ -70,6 +73,7 @@ interface AppState {
   setRoute: (r: Route | null) => void;
   setSunlight: (s: BuildingSunlight | null) => void;
   setReach: (r: Reach | null) => void;
+  setLivability: (l: LivabilityResult | null) => void;
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -83,6 +87,7 @@ export const useApp = create<AppState>((set, get) => ({
   route: null,
   sunlight: null,
   reach: null,
+  livability: null,
   setDate: (date) => set({ date, live: false }),
   setMinute: (minute) => set({ minute: ((minute % 1440) + 1440) % 1440, live: false }),
   goLive: () => set({ ...nowBeijing(), live: true, playing: false }),
@@ -97,4 +102,5 @@ export const useApp = create<AppState>((set, get) => ({
   setRoute: (route) => set({ route }),
   setSunlight: (sunlight) => set({ sunlight }),
   setReach: (reach) => set({ reach }),
+  setLivability: (livability) => set({ livability }),
 }));
