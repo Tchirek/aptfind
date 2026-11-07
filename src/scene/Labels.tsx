@@ -173,7 +173,7 @@ function buildLabels(d: District): { points: PointLabel[]; roads: RoadLabel[] } 
     });
   }
 
-  // 麦当劳、星巴克、海底捞：画品牌徽标
+  // 麦当劳、肯德基、星巴克、盒马：画品牌徽标
   for (const p of d.pois) {
     if (!(BRAND_CATEGORIES as readonly string[]).includes(p.category)) continue;
     points.push({

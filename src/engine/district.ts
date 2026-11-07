@@ -81,11 +81,11 @@ export type PoiCategory =
   | 'sport'
   /** 指名标出的连锁品牌 */
   | 'mcdonalds'
+  | 'kfc'
   | 'starbucks'
-  | 'haidilao'
-  | 'hongqi';
+  | 'hema';
 
-export const BRAND_CATEGORIES = ['mcdonalds', 'starbucks', 'haidilao'] as const;
+export const BRAND_CATEGORIES = ['mcdonalds', 'kfc', 'starbucks', 'hema'] as const;
 
 export interface Poi {
   name: string;

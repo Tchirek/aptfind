@@ -8,7 +8,7 @@
  *   await jgCollect.regeo()   逆地理编码：每栋楼所在的 AOI（小区/校园）与附近 POI
  *   await jgCollect.roads()   逆地理编码：OSM 里没有名字的道路，沿线样点附近的道路名
  *   await jgCollect.pois()    按类别搜索片区内的设施 POI
- *   await jgCollect.brands()  麦当劳、星巴克、海底捞（片区外扩约 3 km）
+ *   await jgCollect.brands()  麦当劳、肯德基、星巴克（片区外扩约 3 km）与大型商超（外扩约 8 km）
  *   await jgCollect.photos()  小区、校园的地点详情照片（读 compound-points.json，由管线生成）
  */
 
@@ -246,16 +246,23 @@ async function pois(grid = 3, only?: string[]): Promise<Record<string, number>> 
   return summary;
 }
 
-/** 几个指名的连锁品牌：片区外扩约 3 km 内按关键词搜，供"最近一家多远"与地图标注 */
-export const BRANDS = ['麦当劳', '星巴克', '海底捞'] as const;
+/** 几个指名的连锁品牌：按关键词搜，供"最近一家多远"与地图标注 */
+export const BRANDS = ['麦当劳', '肯德基', '星巴克'] as const;
+/** 大型商超门店少，搜得更远，再按离片区的远近挑一个 */
+export const STORES = ['山姆', '沃尔玛', '盒马'] as const;
 
 async function brands(): Promise<number> {
   const WIDE = { south: 30.578, west: 104.075, north: 30.655, east: 104.165 };
+  const WIDER = { south: 30.545, west: 104.035, north: 30.69, east: 104.205 };
   const found = new Map<string, unknown>();
-  for (const brand of BRANDS) {
+  const jobs = [
+    ...BRANDS.map((b) => [b, WIDE] as const),
+    ...STORES.map((b) => [b, WIDER] as const),
+  ];
+  for (const [brand, box] of jobs) {
     const bounds = new window.AMap.Bounds(
-      wgs84ToGcj02(WIDE.west, WIDE.south),
-      wgs84ToGcj02(WIDE.east, WIDE.north),
+      wgs84ToGcj02(box.west, box.south),
+      wgs84ToGcj02(box.east, box.north),
     );
     for (let page = 1; page <= 10; page++) {
       const ps = new window.AMap.PlaceSearch({ pageSize: 50, pageIndex: page, extensions: 'base' });

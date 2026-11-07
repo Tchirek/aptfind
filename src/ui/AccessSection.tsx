@@ -24,14 +24,14 @@ const ROWS: Row[] = [
   { category: 'metro', label: '地铁' },
   { category: 'bus', label: '公交' },
   { category: 'grocery', label: '超市便利' },
-  { category: 'hongqi', label: '红旗连锁', logo: 'hongqi' },
   { category: 'market', label: '菜市场' },
   { category: 'food', label: '餐饮', countOnly: true },
   { category: 'medical', label: '医疗' },
   { category: 'park', label: '公园' },
   { category: 'mcdonalds', label: '麦当劳', logo: 'mcdonalds' },
+  { category: 'kfc', label: '肯德基', logo: 'kfc' },
   { category: 'starbucks', label: '星巴克', logo: 'starbucks' },
-  { category: 'haidilao', label: '海底捞', logo: 'haidilao' },
+  { category: 'hema', label: '盒马', logo: 'hema' },
 ];
 
 /** '麦当劳(华固一品店)' → '华固一品店'：品牌行已有徽标，只留分店名 */

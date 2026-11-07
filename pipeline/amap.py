@@ -109,11 +109,11 @@ def load_pois(raw: Path) -> list[Poi]:
     return out
 
 
-# 指名标出的连锁品牌：类别名 → 店名须以它开头（排除"甜品站""取餐点"与以公司名登记的重复点）
-BRANDS = {"mcdonalds": "麦当劳", "starbucks": "星巴克", "haidilao": "海底捞"}
-# 成都本地的连锁商超：从超市便利店里挑出来（门店多，片区内就有二十多家）
-GROCERY_BRANDS = {"hongqi": ("红旗连锁", "红旗超市")}
-BRAND_EXCLUDE = re.compile(r"(甜品站|取餐点|外送|外卖)")
+# 指名标出的连锁品牌：类别名 → 店名须以它开头；只收餐饮、购物类的门店，
+# 排除"甜品站""取餐点"、外卖点，以及盒马的收货区、配送站、前置仓、烘焙档口
+BRANDS = {"mcdonalds": "麦当劳", "kfc": "肯德基", "starbucks": "星巴克", "hema": "盒马"}
+BRAND_EXCLUDE = re.compile(r"(甜品站|取餐点|外送|外卖|收货|配送|前置仓|驿站|提货|烘焙)")
+BRAND_TYPES = ("餐饮服务", "购物服务")
 
 
 def load_brands(raw: Path) -> list[Poi]:
@@ -125,22 +125,16 @@ def load_brands(raw: Path) -> list[Poi]:
     for p in json.loads(f.read_text(encoding="utf-8")):
         name = p["name"]
         cat = next((k for k, v in BRANDS.items() if name.startswith(v)), None)
-        if cat is None or BRAND_EXCLUDE.search(name) or p["id"] in seen:
+        if (
+            cat is None
+            or BRAND_EXCLUDE.search(name)
+            or not p.get("type", "").startswith(BRAND_TYPES)
+            or p["id"] in seen
+        ):
             continue
         seen.add(p["id"])
         lon, lat = parse_location(p["location"])
         out.append(Poi(cat, name, p.get("type", ""), lon, lat))
-    # 商超品牌从超市便利店的采集结果里挑，原记录仍留在"超市便利"一类
-    g = raw / "poi-grocery.json"
-    if g.exists():
-        for p in json.loads(g.read_text(encoding="utf-8")):
-            name = p["name"]
-            cat = next((k for k, v in GROCERY_BRANDS.items() if name.startswith(v)), None)
-            if cat is None or p["id"] in seen:
-                continue
-            seen.add(p["id"])
-            lon, lat = parse_location(p["location"])
-            out.append(Poi(cat, name, p.get("type", ""), lon, lat))
     return out
 
 
