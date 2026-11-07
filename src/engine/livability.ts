@@ -54,6 +54,8 @@ export interface Penalty {
 export interface LivabilityFacts {
   /** 这栋楼各窗位的大寒日日照分钟数；不在日照计算范围内时为空 */
   windows: ArrayLike<number>;
+  /** 各窗位所在墙面的朝向（正北 0°，顺时针），与 windows 一一对应；缺省时按全部窗位算 */
+  windowAzimuths?: ArrayLike<number>;
   /** 步行到最近地铁口的分钟数；Infinity 表示 3 km 内没有 */
   metroMinutes: number;
   busMinutes: number;
@@ -124,13 +126,35 @@ function median(values: ArrayLike<number>): number {
     : ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2;
 }
 
+/** 朝南（偏东、偏西各 67.5° 以内）算主朝向 */
+const SOUTH_SPREAD = 67.5;
+
+/**
+ * 住宅的起居室、主卧几乎都朝南，大寒日标准也只要求每户有一间居室达标；
+ * 把北墙、山墙上的窗位一并平均会把板楼一律算成"采光差"。
+ * 有朝向时只取朝南墙面上的窗位；一栋楼没有朝南的墙（极少见）才退回全部窗位。
+ */
+export function mainFacadeWindows(
+  windows: ArrayLike<number>,
+  azimuths: ArrayLike<number> | undefined,
+): { values: number[]; south: boolean } {
+  const all = Array.from(windows);
+  if (!azimuths || azimuths.length !== windows.length) return { values: all, south: false };
+  const south = all.filter((_, i) => {
+    const d = Math.abs((((((azimuths[i] as number) - 180) % 360) + 540) % 360) - 180);
+    return d <= SOUTH_SPREAD;
+  });
+  return south.length > 0 ? { values: south, south: true } : { values: all, south: false };
+}
+
 function lightDimension(facts: LivabilityFacts): Dimension | null {
-  const n = facts.windows.length;
-  if (n === 0) return null;
+  if (facts.windows.length === 0) return null;
+  const { values, south } = mainFacadeWindows(facts.windows, facts.windowAzimuths);
+  const n = values.length;
   let lit = 0;
-  for (let i = 0; i < n; i++) if ((facts.windows[i] as number) >= SUNLIGHT_THRESHOLD) lit++;
+  for (const v of values) if (v >= SUNLIGHT_THRESHOLD) lit++;
   const share = lit / n;
-  const med = median(facts.windows);
+  const med = median(values);
   // 达标比例决定大半，中位数兜底：一栋楼只有少数窗位好不能算采光好
   const score = MAX.light * (0.45 * share ** 0.7 + 0.55 * clamp(med / 240, 0, 1));
   return {
@@ -138,7 +162,7 @@ function lightDimension(facts: LivabilityFacts): Dimension | null {
     label: '采光',
     score,
     max: MAX.light,
-    detail: `${Math.round(share * 100)}% 窗位达标 · 中位 ${hours(med)}`,
+    detail: `${south ? '朝南' : ''}窗位 ${Math.round(share * 100)}% 达标 · 中位 ${hours(med)}`,
   };
 }
 
@@ -146,7 +170,7 @@ function hours(minutes: number): string {
   const m = Math.round(minutes);
   const h = Math.floor(m / 60);
   const r = m % 60;
-  if (h === 0) return `${r} 分`;
+  if (h === 0) return `${r} 分钟`;
   return r === 0 ? `${h} 小时` : `${h} 小时 ${r} 分`;
 }
 
@@ -158,10 +182,10 @@ function transitDimension(facts: LivabilityFacts): Dimension {
     ? clamp(1 - (facts.busMinutes - 2) / 18, 0, 1) ** 0.9 * 6
     : 0;
   const metroText = Number.isFinite(facts.metroMinutes)
-    ? `地铁 ${Math.max(1, Math.round(facts.metroMinutes))} 分`
+    ? `步行到地铁 ${Math.max(1, Math.round(facts.metroMinutes))} 分钟`
     : '地铁 3 km 内没有';
   const busText = Number.isFinite(facts.busMinutes)
-    ? `公交 ${Math.max(1, Math.round(facts.busMinutes))} 分`
+    ? `公交 ${Math.max(1, Math.round(facts.busMinutes))} 分钟`
     : '公交 3 km 内没有';
   return {
     key: 'transit',
@@ -183,13 +207,13 @@ function amenityDimension(facts: LivabilityFacts): Dimension {
   const medical =
     3 * (0.75 * nearByMinutes(facts.medicalMinutes, 6, 15) + 0.25 * logRatio(w.medical, 6));
   const park = 3 * (0.75 * nearByMinutes(facts.parkMinutes, 6, 15) + 0.25 * logRatio(w.park, 4));
-  const nearest = (m: number) => (Number.isFinite(m) ? `${Math.max(1, Math.round(m))} 分` : '无');
+  const nearest = (m: number) => (Number.isFinite(m) ? `${Math.max(1, Math.round(m))} 分钟` : '无');
   return {
     key: 'amenity',
     label: '生活配套',
     score: grocery + market + food + medical + park,
     max: MAX.amenity,
-    detail: `超市 ${nearest(facts.groceryMinutes)} · 菜市场 ${nearest(
+    detail: `步行到超市 ${nearest(facts.groceryMinutes)} · 菜市场 ${nearest(
       facts.marketMinutes,
     )} · 10 分钟内餐饮 ${w.food} 家`,
   };

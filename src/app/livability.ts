@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import type { Building } from '../engine/district';
+import { wallAzimuth } from '../engine/geometry';
 import { type Livability, scoreLivability } from '../engine/livability';
 import { greenDistance, nearestRoad, slopePercent } from '../engine/site';
 import type { SunlightEngine } from '../engine/sunlight';
@@ -76,6 +77,9 @@ export function LivabilityController({ data }: { data: SceneData }): null {
     const start = data.windowRange[2 * building] as number;
     const count = data.windowRange[2 * building + 1] as number;
     const windows = data.dahanMinutes.subarray(start, start + count);
+    const windowAzimuths = Float32Array.from({ length: count }, (_, k) =>
+      wallAzimuth(data.grid, start + k),
+    );
 
     Promise.all([
       getRegion(),
@@ -92,6 +96,7 @@ export function LivabilityController({ data }: { data: SceneData }): null {
       const road = nearestRoad(data.district.roads, x, y);
       const result = scoreLivability({
         windows,
+        windowAzimuths,
         metroMinutes: minutes('metro'),
         busMinutes: minutes('bus'),
         groceryMinutes: minutes('grocery'),

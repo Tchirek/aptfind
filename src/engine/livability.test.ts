@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type LivabilityFacts, logRatio, scoreLivability } from './livability';
+import { type LivabilityFacts, logRatio, mainFacadeWindows, scoreLivability } from './livability';
 
 const good: LivabilityFacts = {
   windows: [300, 320, 280, 260, 300, 320, 290, 310],
@@ -105,5 +105,26 @@ describe('scoreLivability', () => {
       expect(t).toBeGreaterThanOrEqual(0);
       expect(t).toBeLessThanOrEqual(100);
     }
+  });
+});
+
+describe('mainFacadeWindows', () => {
+  it('只取朝南的窗位，北墙与正东正西不算', () => {
+    const r = mainFacadeWindows([300, 0, 200, 0, 0], [180, 0, 130, 90, 270]);
+    expect(r.south).toBe(true);
+    expect(r.values).toEqual([300, 200]);
+  });
+  it('没有朝向或没有朝南的墙时退回全部窗位', () => {
+    expect(mainFacadeWindows([1, 2], undefined)).toEqual({ values: [1, 2], south: false });
+    expect(mainFacadeWindows([1, 2], [0, 10])).toEqual({ values: [1, 2], south: false });
+  });
+  it('板楼北墙全黑、南墙达标时，采光分不被北墙拖垮', () => {
+    const windows = [240, 240, 240, 240, 0, 0, 0, 0];
+    const az = [180, 180, 180, 180, 0, 0, 0, 0];
+    const withAz = scoreLivability({ ...good, windows, windowAzimuths: az });
+    const without = scoreLivability({ ...good, windows });
+    const light = (l: typeof withAz) => l.dimensions.find((d) => d.key === 'light')?.score ?? 0;
+    expect(light(withAz)).toBeCloseTo(30, 0);
+    expect(light(withAz)).toBeGreaterThan(light(without) + 10);
   });
 });
