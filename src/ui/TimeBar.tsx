@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { formatClock } from '../app/format';
 import { useApp } from '../app/store';
 import {
@@ -56,6 +56,7 @@ function NowIcon() {
 }
 
 export function TimeBar() {
+  const ref = useRef<HTMLDivElement>(null);
   const date = useApp((s) => s.date);
   const minute = useApp((s) => s.minute);
   const live = useApp((s) => s.live);
@@ -63,6 +64,18 @@ export function TimeBar() {
   const { setDate, setMinute, setPlaying, goLive, syncNow } = useApp.getState();
 
   const { sunrise, sunset } = dayTimes(date);
+
+  // 面板高度写进 CSS 变量：手机上的详情面板要恰好落在这条时间栏上方
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const publish = () =>
+      document.documentElement.style.setProperty('--timebar-h', `${el.offsetHeight}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const id = setInterval(syncNow, 30_000);
@@ -110,7 +123,7 @@ export function TimeBar() {
     `#d9d5cc ${sunsetPct}%, #d9d5cc 100%)`;
 
   return (
-    <div className="panel timebar">
+    <div className="panel timebar" ref={ref}>
       <div className="tb-date-row">
         <input
           type="date"

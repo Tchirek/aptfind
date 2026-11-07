@@ -229,6 +229,7 @@ const overlaps = (a: Box, b: Box) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 &
 
 export function Labels({ district }: { district: District }) {
   const { camera, gl, size, controls } = useThree();
+  const compact = size.width < 640;
   const labels = useMemo(() => buildLabels(district), [district]);
   const canvas = useMemo(() => {
     const c = document.createElement('canvas');
@@ -338,7 +339,7 @@ export function Labels({ district }: { district: District }) {
     const items: Item[] = [];
 
     for (const p of labels.points) {
-      if (dist > p.maxDistance) continue;
+      if (dist > p.maxDistance * (compact ? 0.75 : 1)) continue;
       const d = Math.hypot(p.x - tx, p.y - ty);
       if (d > radius) continue;
       items.push({
@@ -395,6 +396,8 @@ export function Labels({ district }: { district: District }) {
     }
 
     for (const r of labels.roads) {
+      // 手机上不标支路，只留主干道
+      if (compact && r.cls > 2) continue;
       if (dist > r.maxDistance) continue;
       const near = r.runs
         .map((run) => ({ run, d: Math.hypot(run.mx - tx, run.my - ty) }))
@@ -451,7 +454,8 @@ export function Labels({ district }: { district: District }) {
     }
 
     items.sort((a, b) => b.priority - a.priority || a.d - b.d);
-    for (const it of items) it.draw();
+    const limit = compact ? 16 : items.length;
+    for (const it of items.slice(0, limit)) it.draw();
   });
 
   return null;

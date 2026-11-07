@@ -27,6 +27,18 @@ body,
   overflow: hidden;
 }
 
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
+body {
+  overscroll-behavior: none;
+}
+
 canvas {
   display: block;
   touch-action: none;
@@ -434,18 +446,82 @@ button {
   font-size: 14px;
 }
 
+/* 手机：搜索占满顶部，详情是停靠在时间栏上方的底部面板 */
 @media (max-width: 720px) {
   .attribution-wrap {
-    right: 12px;
-    bottom: 10px;
+    left: 8px;
+    right: auto;
+    align-items: flex-start;
+    bottom: calc(var(--timebar-h, 120px) + 20px + env(safe-area-inset-bottom));
+  }
+  .attribution-panel {
+    max-width: min(280px, calc(100vw - 16px));
   }
   .inspector {
     top: auto;
-    bottom: 120px;
-    left: 10px;
-    right: 10px;
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--timebar-h, 120px) + 16px + env(safe-area-inset-bottom));
     width: auto;
-    max-height: 46vh;
+    max-height: 46dvh;
+    padding: 14px 16px 16px;
+    border-radius: 12px;
+  }
+  .inspector-head h2 {
+    font-size: 17px;
+  }
+  .close {
+    top: 6px;
+    right: 6px;
+    width: 36px;
+    height: 36px;
+    font-size: 24px;
+  }
+  .big-number {
+    font-size: 28px;
+  }
+  /* 手机上触控目标至少 36px */
+  .blockers li,
+  .access button {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .reach-text-btn,
+  .reach-toggle,
+  .inspector-head .back {
+    min-height: 32px;
+    padding: 4px 6px;
+  }
+  .liv-dims li {
+    grid-template-columns: 54px 1fr 40px;
+  }
+}
+
+/* 窄屏且横放时（手机横屏），详情改为左侧栏，别挡住时间轴 */
+@media (max-width: 900px) and (max-height: 500px) {
+  .inspector {
+    top: 64px;
+    left: 8px;
+    right: auto;
+    bottom: 8px;
+    width: min(340px, 45vw);
+    max-height: none;
+    border-radius: 10px;
+  }
+  .timebar {
+    left: auto;
+    right: 8px;
+    transform: none;
+    width: min(520px, calc(100vw - 24px));
+  }
+  /* 详情面板打开时，时间栏让出左侧，避免压住播放键 */
+  body:has(.inspector) .timebar {
+    left: 356px;
+    right: 8px;
+    width: auto;
+  }
+  .attribution-wrap {
+    display: none;
   }
 }
 

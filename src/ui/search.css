@@ -93,8 +93,17 @@
 
 @media (max-width: 720px) {
   .search-box {
-    left: 12px;
-    right: 12px;
+    left: 8px;
+    right: 8px;
+    top: calc(8px + env(safe-area-inset-top));
     width: auto;
+  }
+  /* 16px 以下 iOS 会在聚焦时放大页面 */
+  .search-input {
+    font-size: 16px;
+    padding: 10px 12px;
+  }
+  .search-item {
+    padding: 10px 12px;
   }
 }

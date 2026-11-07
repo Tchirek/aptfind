@@ -1,6 +1,7 @@
 import { MapControls } from '@react-three/drei';
-import { Canvas } from '@react-three/fiber';
-import { NeutralToneMapping } from 'three';
+import { Canvas, useThree } from '@react-three/fiber';
+import { useEffect, useRef } from 'react';
+import { NeutralToneMapping, type PerspectiveCamera } from 'three';
 import type { SceneData } from '../app/data';
 import { useApp } from '../app/store';
 import { Buildings } from './Buildings';
@@ -13,6 +14,30 @@ import { Labels } from './Labels';
 import { Overlays } from './Overlays';
 import { Reach } from './Reach';
 import { Sun } from './Sun';
+
+/**
+ * 竖屏时水平视野只有横屏的四成左右：把镜头拉远、视角放宽一点，
+ * 否则手机上只能看到一小片楼。只在挂载时拉远一次，之后交给用户。
+ */
+function CameraFit() {
+  const { camera, size } = useThree();
+  const fitted = useRef(false);
+  useEffect(() => {
+    const aspect = size.width / Math.max(1, size.height);
+    const portrait = aspect < 0.85;
+    const p = camera as PerspectiveCamera;
+    const fov = portrait ? 42 : 30;
+    if (Math.abs(p.fov - fov) > 0.01) {
+      p.fov = fov;
+      p.updateProjectionMatrix();
+    }
+    if (!fitted.current) {
+      fitted.current = true;
+      if (portrait) camera.position.multiplyScalar(1.7);
+    }
+  }, [camera, size.width, size.height]);
+  return null;
+}
 
 export function Scene({ data }: { data: SceneData }) {
   const select = useApp((s) => s.select);
@@ -45,6 +70,7 @@ export function Scene({ data }: { data: SceneData }) {
         screenSpacePanning={false}
       />
       <CameraRig />
+      <CameraFit />
       <Labels district={data.district} />
       {import.meta.env.DEV && <DevHandle />}
     </Canvas>

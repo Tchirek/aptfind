@@ -226,16 +226,69 @@
 
 @media (max-width: 720px) {
   .timebar {
-    bottom: 10px;
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    width: auto;
+    transform: none;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .tb-date-row {
+    gap: 6px;
+  }
+  .tb-date-input {
+    width: 126px;
+    font-size: 16px;
+    padding: 4px 6px;
   }
   .tb-terms {
     overflow-x: auto;
     flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .tb-terms::-webkit-scrollbar {
+    display: none;
+  }
+  .tb-term {
+    padding: 6px 9px;
+  }
+  .tb-time-row {
+    gap: 8px;
+  }
+  .tb-play {
+    width: 38px;
+    height: 38px;
+  }
+  .tb-range {
+    height: 20px;
+  }
+  .tb-range::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    margin-top: -7px;
+  }
+  .tb-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+  }
+  .tb-ticks {
+    height: 12px;
+  }
+  .tb-ticks span {
+    font-size: 9px;
   }
   .tb-readout {
-    width: 104px;
+    width: 88px;
+  }
+  .tb-clock-time {
+    font-size: 17px;
   }
   .tb-sun-info {
     display: none;
+  }
+  .tb-go-live {
+    width: 24px;
+    height: 24px;
   }
 }

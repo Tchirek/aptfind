@@ -9,7 +9,7 @@ import { type Livability, scoreLivability } from '../engine/livability';
 import { greenDistance, nearestRoad, slopePercent } from '../engine/site';
 import type { SunlightEngine } from '../engine/sunlight';
 import { viewFrom } from '../engine/view';
-import { accessFrom, buildingDoors } from '../engine/walk';
+import { accessFrom, buildingDoors, minutesOf } from '../engine/walk';
 import { getEngine, getRegion, type SceneData } from './data';
 import { selectedBuilding, useApp } from './store';
 
@@ -83,15 +83,21 @@ export function LivabilityController({ data }: { data: SceneData }): null {
     ]).then(([{ graph, pois }, openness]) => {
       const access = accessFrom(graph, pois, buildingDoors(graph, ring), 3000);
       const cat = (key: string) => access.categories.find((c) => c.category === key);
+      const minutes = (key: string) => {
+        const meters = cat(key)?.meters;
+        return meters === undefined || !Number.isFinite(meters)
+          ? Number.POSITIVE_INFINITY
+          : minutesOf(meters);
+      };
       const road = nearestRoad(data.district.roads, x, y);
       const result = scoreLivability({
         windows,
-        metroMinutes: cat('metro')?.meters ?? Number.POSITIVE_INFINITY,
-        busMinutes: cat('bus')?.meters ?? Number.POSITIVE_INFINITY,
-        groceryMinutes: cat('grocery')?.meters ?? Number.POSITIVE_INFINITY,
-        marketMinutes: cat('market')?.meters ?? Number.POSITIVE_INFINITY,
-        medicalMinutes: cat('medical')?.meters ?? Number.POSITIVE_INFINITY,
-        parkMinutes: cat('park')?.meters ?? Number.POSITIVE_INFINITY,
+        metroMinutes: minutes('metro'),
+        busMinutes: minutes('bus'),
+        groceryMinutes: minutes('grocery'),
+        marketMinutes: minutes('market'),
+        medicalMinutes: minutes('medical'),
+        parkMinutes: minutes('park'),
         within10: {
           grocery: cat('grocery')?.within10 ?? 0,
           market: cat('market')?.within10 ?? 0,
