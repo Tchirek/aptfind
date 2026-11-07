@@ -10,6 +10,7 @@ import { DevHandle } from './DevHandle';
 import { Facades } from './Facades';
 import { Ground } from './Ground';
 import { Overlays } from './Overlays';
+import { Reach } from './Reach';
 import { Sun } from './Sun';
 
 export function Scene({ data }: { data: SceneData }) {
@@ -30,6 +31,7 @@ export function Scene({ data }: { data: SceneData }) {
         <Buildings data={data} />
         <Facades data={data} />
         <Overlays data={data} />
+        <Reach district={data.district} />
       </group>
       <MapControls
         makeDefault
@@ -37,7 +39,7 @@ export function Scene({ data }: { data: SceneData }) {
         enableDamping
         dampingFactor={0.12}
         minDistance={30}
-        maxDistance={3600}
+        maxDistance={26000}
         maxPolarAngle={1.42}
         screenSpacePanning={false}
       />

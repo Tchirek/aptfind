@@ -1,6 +1,7 @@
 import { Component, type ReactNode, Suspense, use, useState } from 'react';
 import { SunlightController } from './app/buildingSunlight';
 import { sceneData } from './app/data';
+import { ReachController } from './app/reach';
 import { Scene } from './scene/Scene';
 import { Inspector } from './ui/Inspector';
 import { SearchBox } from './ui/SearchBox';
@@ -29,6 +30,7 @@ function Main() {
   return (
     <>
       <SunlightController data={data} />
+      <ReachController data={data} />
       <Scene data={data} />
       <SearchBox data={data} />
       <TimeBar />

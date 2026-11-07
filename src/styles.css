@@ -391,6 +391,22 @@ button {
   font-weight: 600;
   color: var(--ink);
 }
+/* 30 分钟内坐地铁能出站的车站 */
+.map-label.station {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: rgba(16, 92, 82, 0.9);
+  color: #fff;
+  font-size: 11px;
+  text-shadow: none;
+}
+.map-label.station small {
+  color: #bfe7df;
+  font-size: 10px;
+}
 
 .splash {
   height: 100%;
