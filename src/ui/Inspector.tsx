@@ -25,16 +25,6 @@ function builtYear(d: District, k: number): number | null {
   return c.builtYear ?? (c.parent >= 0 ? (d.compounds[c.parent]?.builtYear ?? null) : null);
 }
 
-function ringCenter(ring: Float64Array): [number, number] {
-  let x = 0;
-  let y = 0;
-  for (let i = 0; i < ring.length; i += 2) {
-    x += ring[i] as number;
-    y += ring[i + 1] as number;
-  }
-  return [(2 * x) / ring.length, (2 * y) / ring.length];
-}
-
 /** 一组窗位里大寒日不足 2 小时的比例 */
 function shortfall(data: SceneData, buildings: Iterable<number>): { below: number; count: number } {
   let below = 0;
@@ -107,7 +97,6 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
     () => (result ? result.spans.filter((s) => s.state !== LIT && s.state !== AWAY) : []),
     [result],
   );
-  const [cx, cy] = ringCenter(b.rings[0] as Float64Array);
 
   return (
     <>
@@ -159,7 +148,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
       )}
 
       <ViewSection data={data} index={index} />
-      <AccessSection x={cx} y={cy} />
+      <AccessSection ring={b.rings[0] as Float64Array} />
 
       <section className="note">
         <p>{heightNote(b)}</p>
@@ -174,7 +163,6 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
   const { title, subtitle } = buildingTitle(d, b);
   const year = builtYear(d, b.compound);
   const { below, count } = shortfall(data, [index]);
-  const [cx, cy] = ringCenter(b.rings[0] as Float64Array);
 
   return (
     <>
@@ -197,7 +185,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
           </p>
         </section>
       )}
-      <AccessSection x={cx} y={cy} />
+      <AccessSection ring={b.rings[0] as Float64Array} />
     </>
   );
 }
@@ -216,7 +204,6 @@ function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
   if (!c) return null;
   const { below, count } = shortfall(data, members);
   const largest = [...c.rings].sort((a, b) => b.length - a.length)[0] as Float64Array;
-  const [cx, cy] = ringCenter(largest);
   const parent = c.parent >= 0 ? d.compounds[c.parent] : undefined;
 
   return (
@@ -240,7 +227,7 @@ function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
           </p>
         </section>
       )}
-      <AccessSection x={cx} y={cy} />
+      <AccessSection ring={largest} />
     </>
   );
 }

@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
-import { getWalk } from '../app/data';
+import { getRegion } from '../app/data';
 import { useApp } from '../app/store';
 import type { PoiCategory } from '../engine/district';
-import { type Access, accessFrom, minutesOf, type WalkGraph } from '../engine/walk';
+import {
+  type Access,
+  accessFrom,
+  buildingDoors,
+  minutesOf,
+  routeToPoi,
+  type WalkGraph,
+} from '../engine/walk';
 
 interface Row {
   category: PoiCategory;
@@ -30,8 +37,11 @@ export function shortPoiName(name: string): string {
 
 const fmtMinutes = (meters: number) => `${Math.max(1, Math.round(minutesOf(meters)))} 分钟`;
 
-/** 从 (x, y) 步行到各类设施：最近一处与用时；点一行在地图上画出路线 */
-export function AccessSection({ x, y }: { x: number; y: number }) {
+/**
+ * 从一栋楼（或一个地块）的外轮廓出发，步行到各类设施：最近一处与用时；点一行在地图上画出路线。
+ * 路线从轮廓上离路最近的出入口画起，不会从楼中间穿出来。
+ */
+export function AccessSection({ ring }: { ring: Float64Array }) {
   const setRoute = useApp((s) => s.setRoute);
   const [state, setState] = useState<{ access: Access; graph: WalkGraph } | null>(null);
   const [active, setActive] = useState<PoiCategory>('metro');
@@ -39,14 +49,14 @@ export function AccessSection({ x, y }: { x: number; y: number }) {
   useEffect(() => {
     let alive = true;
     setState(null);
-    getWalk().then(({ graph, pois }) => {
+    getRegion().then(({ graph, pois }) => {
       if (!alive) return;
-      setState({ access: accessFrom(graph, pois, x, y, 2000), graph });
+      setState({ access: accessFrom(graph, pois, buildingDoors(graph, ring), 2000), graph });
     });
     return () => {
       alive = false;
     };
-  }, [x, y]);
+  }, [ring]);
 
   useEffect(() => {
     if (!state) return;
@@ -56,13 +66,8 @@ export function AccessSection({ x, y }: { x: number; y: number }) {
       setRoute(null);
       return;
     }
-    const path = state.graph.route(state.access.paths, p.node);
-    const points = new Float64Array(path.length + 4);
-    points.set([x, y], 0);
-    points.set(path, 2);
-    points.set([p.poi.x, p.poi.y], path.length + 2);
-    setRoute({ points, label: shortPoiName(p.poi.name) });
-  }, [state, active, x, y, setRoute]);
+    setRoute({ points: routeToPoi(state.graph, state.access, p), label: shortPoiName(p.poi.name) });
+  }, [state, active, setRoute]);
 
   useEffect(() => () => setRoute(null), [setRoute]);
 
