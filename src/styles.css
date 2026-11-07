@@ -494,3 +494,24 @@ button {
     max-height: 46vh;
   }
 }
+
+/* 悬停窗位的标签 */
+.window-tip {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(31, 31, 28, 0.88);
+  color: #fff;
+  font-size: 12px;
+  transform: translateY(-16px);
+  pointer-events: none;
+}
+.window-tip b {
+  font-weight: 600;
+}
+.window-tip span {
+  color: #d9d5cc;
+}

@@ -1,9 +1,13 @@
+import { Html } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BufferAttribute, BufferGeometry, DoubleSide } from 'three';
 import type { SceneData } from '../app/data';
-import { useApp } from '../app/store';
+import { formatDuration, windowOrientation } from '../app/format';
+import { selectedBuilding, useApp } from '../app/store';
+import { dayTimes } from '../app/time';
 import type { WindowGrid } from '../engine/geometry';
+import { warmSpanFor } from '../ui/palette';
 import { isDrag } from './Buildings';
 import {
   buildFacadeGeometry,
@@ -12,8 +16,8 @@ import {
   vertexToWindow,
 } from './facadeGeometry';
 
-/** 选中窗位的黑框：四条细边，比窗格再往外抬一点 */
-function frameGeometry(grid: WindowGrid, i: number): BufferGeometry {
+/** 窗位的框：四条细边，比窗格再往外抬一点 */
+function frameGeometry(grid: WindowGrid, i: number, width: number): BufferGeometry {
   const x0 = grid.x0[i] as number;
   const y0 = grid.y0[i] as number;
   const x1 = grid.x1[i] as number;
@@ -26,7 +30,7 @@ function frameGeometry(grid: WindowGrid, i: number): BufferGeometry {
   const lift = 0.14;
   const nx = uy * lift;
   const ny = -ux * lift;
-  const t = Math.max(0.12, Math.min(0.3, len * 0.06));
+  const t = Math.max(0.1, Math.min(width, len * 0.06));
   const quads: number[][] = [];
   const quad = (a: number, b: number, za: number, zb: number) =>
     quads.push([a, za, b, za, b, zb, a, zb]);
@@ -48,40 +52,125 @@ function frameGeometry(grid: WindowGrid, i: number): BufferGeometry {
   return g;
 }
 
+function windowCenter(grid: WindowGrid, i: number): [number, number, number] {
+  const x0 = grid.x0[i] as number;
+  const y0 = grid.y0[i] as number;
+  const x1 = grid.x1[i] as number;
+  const y1 = grid.y1[i] as number;
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  // 往墙外让出 0.6 m，标签不被墙面遮住
+  return [
+    (x0 + x1) / 2 + ((y1 - y0) / len) * 0.6,
+    (y0 + y1) / 2 - ((x1 - x0) / len) * 0.6,
+    (grid.z1[i] as number) + 0.3,
+  ];
+}
+
+/**
+ * 选中楼的外墙：按所选日期的逐窗日照着色，悬停的窗位描白框并标出层数与时长，点一下选中这扇窗。
+ * 其他楼保持程序化立面，不着色。
+ */
 export function Facades({ data }: { data: SceneData }) {
   const selection = useApp((s) => s.selection);
   const select = useApp((s) => s.select);
+  const sunlight = useApp((s) => s.sunlight);
+  const { grid } = data;
+  const building = selectedBuilding(selection, grid);
+  const start = building === null ? 0 : (data.windowRange[2 * building] as number);
+  const n = building === null ? 0 : (data.windowRange[2 * building + 1] as number);
 
   const geometry = useMemo(() => {
-    const g = buildFacadeGeometry(data.grid);
+    if (n === 0) return null;
+    const g = buildFacadeGeometry(grid, start, n);
     g.computeBoundsTree();
     return g;
-  }, [data.grid]);
+  }, [grid, start, n]);
+  useEffect(() => () => geometry?.dispose(), [geometry]);
 
   const material = useMemo(() => facadeMaterial(), []);
+  const date = useApp((s) => s.date);
+  useEffect(() => {
+    const t = dayTimes(date);
+    (material.uniforms.uWarmSpan as { value: number }).value = warmSpanFor(t.sunset - t.sunrise);
+  }, [material, date]);
 
   useEffect(() => {
-    paintFacades(geometry, data.grid, data.dahanMinutes);
-  }, [geometry, data.grid, data.dahanMinutes]);
+    if (geometry && sunlight && sunlight.building === building) {
+      paintFacades(geometry, grid, start, sunlight.minutes);
+    }
+  }, [geometry, grid, start, building, sunlight]);
 
+  const [hover, setHover] = useState<number | null>(null);
+  useEffect(() => setHover(null), [building]);
+
+  const selectedWindow = selection?.kind === 'window' ? selection.index : null;
   const frame = useMemo(
-    () => (selection?.kind === 'window' ? frameGeometry(data.grid, selection.index) : null),
-    [data.grid, selection],
+    () => (selectedWindow === null ? null : frameGeometry(grid, selectedWindow, 0.3)),
+    [grid, selectedWindow],
+  );
+  const hoverFrame = useMemo(
+    () => (hover === null || hover === selectedWindow ? null : frameGeometry(grid, hover, 0.18)),
+    [grid, hover, selectedWindow],
   );
 
+  if (!geometry) return null;
+
+  const toWindow = (e: ThreeEvent<PointerEvent | MouseEvent>) =>
+    e.face ? start + vertexToWindow(e.face.a) : null;
+
   const onClick = (e: ThreeEvent<MouseEvent>) => {
-    if (isDrag(e) || !e.face) return;
+    if (isDrag(e)) return;
+    const i = toWindow(e);
+    if (i === null) return;
     e.stopPropagation();
-    select({ kind: 'window', index: vertexToWindow(e.face.a) });
+    select({ kind: 'window', index: i });
   };
+
+  const hoverMinutes =
+    hover !== null && sunlight?.building === building
+      ? (sunlight.minutes[hover - start] as number)
+      : Number.NaN;
 
   return (
     <group>
-      <mesh geometry={geometry} material={material} onClick={onClick} />
+      <mesh
+        geometry={geometry}
+        material={material}
+        onClick={onClick}
+        onPointerMove={(e) => {
+          e.stopPropagation();
+          setHover(toWindow(e));
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHover(null);
+          document.body.style.cursor = '';
+        }}
+      />
+      {hoverFrame && (
+        <mesh geometry={hoverFrame} renderOrder={7}>
+          <meshBasicMaterial color="#ffffff" side={DoubleSide} toneMapped={false} />
+        </mesh>
+      )}
       {frame && (
-        <mesh geometry={frame} renderOrder={7}>
+        <mesh geometry={frame} renderOrder={8}>
           <meshBasicMaterial color="#1f1f1c" side={DoubleSide} toneMapped={false} />
         </mesh>
+      )}
+      {hover !== null && (
+        <Html
+          position={windowCenter(grid, hover)}
+          center
+          zIndexRange={[35, 30]}
+          className="window-tip"
+          style={{ pointerEvents: 'none' }}
+        >
+          <b>{(grid.floor[hover] as number) + 1} 层</b>
+          <span>{windowOrientation(grid, hover)}</span>
+          <span className="mono">
+            {Number.isNaN(hoverMinutes) ? '…' : formatDuration(hoverMinutes)}
+          </span>
+        </Html>
       )}
     </group>
   );

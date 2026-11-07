@@ -1,5 +1,7 @@
 import { create } from 'zustand';
+import type { WindowGrid } from '../engine/geometry';
 import type { CivilDate } from '../engine/solar';
+import type { BuildingSunlight } from './buildingSunlight';
 import { nowBeijing } from './time';
 
 export type Selection =
@@ -7,6 +9,13 @@ export type Selection =
   | { kind: 'building'; index: number }
   | { kind: 'compound'; index: number }
   | null;
+
+/** 选中的楼：选中一扇窗时即这扇窗所在的楼 */
+export function selectedBuilding(s: Selection, grid: WindowGrid): number | null {
+  if (s?.kind === 'building') return s.index;
+  if (s?.kind === 'window') return grid.building[s.index] ?? null;
+  return null;
+}
 
 /** 地图上的点标记：搜索到的设施、道路等没有对应楼的位置 */
 export interface Marker {
@@ -42,6 +51,8 @@ interface AppState {
   flyTo: FlyTo | null;
   marker: Marker | null;
   route: Route | null;
+  /** 选中楼在所选日期的逐窗日照（边算边更新） */
+  sunlight: BuildingSunlight | null;
   setDate: (date: CivilDate) => void;
   setMinute: (minute: number) => void;
   /** 回到现在，并开始跟随 */
@@ -54,6 +65,7 @@ interface AppState {
   requestFly: (target: [number, number, number], distance: number) => void;
   setMarker: (m: Marker | null) => void;
   setRoute: (r: Route | null) => void;
+  setSunlight: (s: BuildingSunlight | null) => void;
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -65,6 +77,7 @@ export const useApp = create<AppState>((set, get) => ({
   flyTo: null,
   marker: null,
   route: null,
+  sunlight: null,
   setDate: (date) => set({ date, live: false }),
   setMinute: (minute) => set({ minute: ((minute % 1440) + 1440) % 1440, live: false }),
   goLive: () => set({ ...nowBeijing(), live: true, playing: false }),
@@ -77,4 +90,5 @@ export const useApp = create<AppState>((set, get) => ({
   requestFly: (target, distance) => set({ flyTo: { target, distance, nonce: Math.random() } }),
   setMarker: (marker) => set({ marker }),
   setRoute: (route) => set({ route }),
+  setSunlight: (sunlight) => set({ sunlight }),
 }));

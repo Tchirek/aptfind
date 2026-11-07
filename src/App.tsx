@@ -1,4 +1,5 @@
 import { Component, type ReactNode, Suspense, use, useState } from 'react';
+import { SunlightController } from './app/buildingSunlight';
 import { sceneData } from './app/data';
 import { Scene } from './scene/Scene';
 import { Inspector } from './ui/Inspector';
@@ -27,6 +28,7 @@ function Main() {
   const data = use(sceneData);
   return (
     <>
+      <SunlightController data={data} />
       <Scene data={data} />
       <SearchBox data={data} />
       <TimeBar />
