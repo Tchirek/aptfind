@@ -73,6 +73,8 @@ function windowCenter(grid: WindowGrid, i: number): [number, number, number] {
 export function Facades({ data }: { data: SceneData }) {
   const selection = useApp((s) => s.selection);
   const select = useApp((s) => s.select);
+  const toggleViewshed = useApp((s) => s.toggleViewshed);
+  const viewshed = useApp((s) => s.viewshed);
   const requestFly = useApp((s) => s.requestFly);
   const sunlight = useApp((s) => s.sunlight);
   const { grid } = data;
@@ -120,12 +122,17 @@ export function Facades({ data }: { data: SceneData }) {
   const toWindow = (e: ThreeEvent<PointerEvent | MouseEvent>) =>
     e.face ? start + vertexToWindow(e.face.a) : null;
 
-  // 选窗：楼已选中，这是"再点一下"，镜头还离得远就顺便拉过去
+  // 选窗：楼已选中，这是"再点一下"，镜头还离得远就顺便拉过去；
+  // 再点一次已选中的窗，显示（或收起）它的视域
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (isDrag(e)) return;
     const i = toWindow(e);
     if (i === null) return;
     e.stopPropagation();
+    if (i === selectedWindow) {
+      toggleViewshed(i);
+      return;
+    }
     select({ kind: 'window', index: i });
     const b = building === null ? undefined : data.district.buildings[building];
     if (b && e.camera.position.distanceTo(e.point) > buildingViewDistance(b) * 1.6) {
@@ -162,7 +169,7 @@ export function Facades({ data }: { data: SceneData }) {
       )}
       {frame && (
         <mesh geometry={frame} renderOrder={8}>
-          <meshBasicMaterial color="#1f1f1c" side={DoubleSide} toneMapped={false} />
+          <meshBasicMaterial color="#0f1e33" side={DoubleSide} toneMapped={false} />
         </mesh>
       )}
       {hover !== null && (
@@ -178,6 +185,7 @@ export function Facades({ data }: { data: SceneData }) {
           <span className="mono">
             {Number.isNaN(hoverMinutes) ? '…' : formatDuration(hoverMinutes)}
           </span>
+          {hover === selectedWindow && <i>{viewshed === hover ? '再点收起视野' : '再点看视野'}</i>}
         </Html>
       )}
     </group>

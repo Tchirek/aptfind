@@ -14,6 +14,7 @@ import { Labels } from './Labels';
 import { Overlays } from './Overlays';
 import { Reach } from './Reach';
 import { Sun } from './Sun';
+import { Viewshed } from './Viewshed';
 
 /**
  * 竖屏时水平视野只有横屏的四成左右：把镜头拉远、视角放宽一点，
@@ -58,6 +59,7 @@ export function Scene({ data }: { data: SceneData }) {
         <Facades data={data} />
         <Overlays data={data} />
         <Reach district={data.district} />
+        <Viewshed data={data} />
       </group>
       <MapControls
         makeDefault

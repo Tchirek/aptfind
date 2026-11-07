@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Building } from './district';
 import { buildSolids, buildWindowGrid, wallAzimuth } from './geometry';
 import { SunlightEngine } from './sunlight';
-import { viewFrom } from './view';
+import { viewFrom, viewshedFrom } from './view';
 
 function box(
   index: number,
@@ -51,5 +51,20 @@ describe('viewFrom', () => {
     const v = viewFrom(engine, grid, north);
     expect(v.frontDistance).toBeNull();
     expect(v.openness).toBe(1);
+  });
+
+  it('视域：正前方水平视线打在对面楼上，北窗水平视线一直看到最远', () => {
+    const v = viewshedFrom(engine, grid, south, { step: 5, far: 300 });
+    expect(v.dist.length).toBe(v.cols * v.rows);
+    const level = Math.round(55 / 5);
+    const mid = (v.cols - 1) / 2;
+    const k = level * v.cols + mid;
+    expect(v.owner[k]).toBe(1);
+    expect(v.dist[k]).toBeLessThan(25);
+    // 正前方水平方向是朝南
+    expect(v.dirs[3 * k + 1]).toBeCloseTo(-1, 5);
+    const n = viewshedFrom(engine, grid, north, { step: 5, far: 300 });
+    expect(n.owner[level * n.cols + mid]).toBe(-1);
+    expect(n.dist[level * n.cols + mid]).toBe(300);
   });
 });

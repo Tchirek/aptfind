@@ -42,3 +42,59 @@ export function viewFrom(engine: SunlightEngine, grid: WindowGrid, i: number): V
     openness: open / total,
   };
 }
+
+/** 视域：窗前法线左右各 85°、俯 55° 到仰 45° 的视线，各自打到哪里 */
+export interface Viewshed {
+  /** 眼睛位置（ENU，米） */
+  eye: [number, number, number];
+  cols: number;
+  rows: number;
+  /** 每条视线的单位方向 [x, y, z, …]，按行（仰角）优先、列（方位）次之 */
+  dirs: Float32Array;
+  /** 每条视线的长度：命中处的距离，没打中为 far */
+  dist: Float32Array;
+  /** 打中了什么：建筑下标、TERRAIN，或 -1 表示一直看到 far 也没有遮挡 */
+  owner: Int32Array;
+  far: number;
+}
+
+export const VIEWSHED_FAR = 900;
+
+export function viewshedFrom(
+  engine: SunlightEngine,
+  grid: WindowGrid,
+  i: number,
+  opts: { halfFan?: number; down?: number; up?: number; step?: number; far?: number } = {},
+): Viewshed {
+  const halfFan = opts.halfFan ?? 85;
+  const down = opts.down ?? 55;
+  const up = opts.up ?? 45;
+  const step = opts.step ?? 2.5;
+  const far = opts.far ?? VIEWSHED_FAR;
+  const s: WindowSample = windowSample(grid, i, { px: 0, py: 0, pz: 0, nx: 0, ny: 0 });
+  const eye: [number, number, number] = [s.px, s.py, s.pz + EYE_ABOVE_SILL];
+  const cols = Math.round((2 * halfFan) / step) + 1;
+  const rows = Math.round((down + up) / step) + 1;
+  const dirs = new Float32Array(cols * rows * 3);
+  const dist = new Float32Array(cols * rows);
+  const owner = new Int32Array(cols * rows);
+  const base = Math.atan2(s.ny, s.nx);
+  for (let r = 0; r < rows; r++) {
+    const el = ((-down + r * step) * Math.PI) / 180;
+    const ce = Math.cos(el);
+    const se = Math.sin(el);
+    for (let c = 0; c < cols; c++) {
+      const az = base + ((-halfFan + c * step) * Math.PI) / 180;
+      const k = r * cols + c;
+      const dx = ce * Math.cos(az);
+      const dy = ce * Math.sin(az);
+      dirs[3 * k] = dx;
+      dirs[3 * k + 1] = dy;
+      dirs[3 * k + 2] = se;
+      const hit = engine.firstHit(eye[0], eye[1], eye[2], dx, dy, se, far);
+      dist[k] = hit ? hit.distance : far;
+      owner[k] = hit ? hit.owner : -1;
+    }
+  }
+  return { eye, cols, rows, dirs, dist, owner, far };
+}

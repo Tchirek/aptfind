@@ -59,6 +59,8 @@ interface AppState {
   reach: Reach | null;
   /** 选中楼的宜居评分 */
   livability: LivabilityResult | null;
+  /** 正在显示视域的窗位（再点一次已选中的窗时打开） */
+  viewshed: number | null;
   setDate: (date: CivilDate) => void;
   setMinute: (minute: number) => void;
   /** 回到现在，并开始跟随 */
@@ -74,6 +76,7 @@ interface AppState {
   setSunlight: (s: BuildingSunlight | null) => void;
   setReach: (r: Reach | null) => void;
   setLivability: (l: LivabilityResult | null) => void;
+  toggleViewshed: (window: number) => void;
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -88,6 +91,7 @@ export const useApp = create<AppState>((set, get) => ({
   sunlight: null,
   reach: null,
   livability: null,
+  viewshed: null,
   setDate: (date) => set({ date, live: false }),
   setMinute: (minute) => set({ minute: ((minute % 1440) + 1440) % 1440, live: false }),
   goLive: () => set({ ...nowBeijing(), live: true, playing: false }),
@@ -95,7 +99,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().live) set(nowBeijing());
   },
   setPlaying: (playing) => set(playing ? { playing, live: false } : { playing }),
-  select: (selection) => set({ selection, focusBuilding: null, route: null }),
+  select: (selection) => set({ selection, focusBuilding: null, route: null, viewshed: null }),
   setFocusBuilding: (focusBuilding) => set({ focusBuilding }),
   requestFly: (target, distance) => set({ flyTo: { target, distance, nonce: Math.random() } }),
   setMarker: (marker) => set({ marker }),
@@ -103,4 +107,5 @@ export const useApp = create<AppState>((set, get) => ({
   setSunlight: (sunlight) => set({ sunlight }),
   setReach: (reach) => set({ reach }),
   setLivability: (livability) => set({ livability }),
+  toggleViewshed: (window) => set({ viewshed: get().viewshed === window ? null : window }),
 }));
