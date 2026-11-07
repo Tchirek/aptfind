@@ -3,35 +3,43 @@ import { type LivabilityFacts, logRatio, mainFacadeWindows, scoreLivability } fr
 
 const good: LivabilityFacts = {
   windows: [300, 320, 280, 260, 300, 320, 290, 310],
-  metroMinutes: 4,
-  busMinutes: 3,
-  groceryMinutes: 3,
-  marketMinutes: 5,
-  medicalMinutes: 6,
-  parkMinutes: 8,
-  within10: { grocery: 12, market: 4, food: 40, medical: 8, park: 4 },
+  metroMinutes: 3,
+  reachStations: 34,
+  busMinutes: 2,
+  groceryMinutes: 2,
+  marketMinutes: 4,
+  hospitalMinutes: 8,
+  kindergartenMinutes: 4,
+  primaryMinutes: 7,
+  middleMinutes: 10,
+  within10: { grocery: 15, food: 200, sport: 12 },
   openness: 0.9,
+  spacing: 80,
   greenMeters: 60,
-  slopePercent: 1,
-  roadMeters: 300,
-  roadClass: 5,
+  coverage: 0.15,
+  roads: [Number.POSITIVE_INFINITY, 300, 300],
+  floors: 18,
   builtYear: 2022,
 };
 
 const bad: LivabilityFacts = {
   windows: [20, 30, 10, 0, 40, 20, 15, 5],
   metroMinutes: 31,
+  reachStations: 2,
   busMinutes: Number.POSITIVE_INFINITY,
   groceryMinutes: 24,
   marketMinutes: Number.POSITIVE_INFINITY,
-  medicalMinutes: 28,
-  parkMinutes: 30,
-  within10: { grocery: 0, market: 0, food: 0, medical: 0, park: 0 },
+  hospitalMinutes: 40,
+  kindergartenMinutes: 25,
+  primaryMinutes: 30,
+  middleMinutes: 40,
+  within10: { grocery: 0, food: 0, sport: 0 },
   openness: 0.1,
+  spacing: 10,
   greenMeters: 1200,
-  slopePercent: 14,
-  roadMeters: 5,
-  roadClass: 1,
+  coverage: 0.5,
+  roads: [20, 5, 5],
+  floors: 6,
   builtYear: 1985,
 };
 
@@ -62,32 +70,53 @@ describe('scoreLivability', () => {
     expect(r.total).toBeGreaterThanOrEqual(85);
     expect(r.tone).toBe('good');
     expect(r.penalties).toHaveLength(0);
-    expect(r.dimensions).toHaveLength(5);
+    expect(r.dimensions).toHaveLength(6);
   });
 
-  it('条件差的楼分数低，临主干道要扣分且不超过上限', () => {
+  it('条件差的楼分数低，临快速路扣得最多且不超过上限', () => {
     const r = scoreLivability(bad);
     expect(r.total).toBeLessThan(45);
     expect(r.tone).toBe('poor');
     const pen = r.penalties.find((p) => p.label === '交通噪声');
-    expect(pen).toBeDefined();
-    expect(pen?.points).toBeGreaterThan(0);
-    expect(pen?.points).toBeLessThanOrEqual(6);
+    expect(pen?.points).toBeGreaterThan(5);
+    expect(pen?.points).toBeLessThanOrEqual(8);
+    expect(pen?.detail).toContain('快速路');
+  });
+
+  it('只差在低层被挡：较差两成窗位拉低采光分', () => {
+    const open = scoreLivability({ ...good, windows: [300, 300, 300, 300, 300] });
+    const shaded = scoreLivability({ ...good, windows: [0, 0, 300, 300, 300] });
+    const light = (l: typeof open) => l.dimensions.find((d) => d.key === 'light')?.score ?? 0;
+    expect(light(open) - light(shaded)).toBeGreaterThan(8);
+  });
+
+  it('同样条件下，7 层以上有电梯比 6 层多层分高', () => {
+    const b = (f: number) =>
+      scoreLivability({ ...good, floors: f }).dimensions.find((d) => d.key === 'building');
+    expect((b(18)?.score ?? 0) - (b(6)?.score ?? 0)).toBeCloseTo(4, 5);
+    expect(b(6)?.detail).toContain('无电梯');
+  });
+
+  it('楼间距与周边覆盖率拉开环境分', () => {
+    const env = (f: Partial<LivabilityFacts>) =>
+      scoreLivability({ ...good, ...f }).dimensions.find((d) => d.key === 'environment')?.score ??
+      0;
+    expect(env({}) - env({ spacing: 12, coverage: 0.45 })).toBeGreaterThan(7);
   });
 
   it('没有窗位时不含采光一项，按其余维度归一', () => {
     const r = scoreLivability({ ...good, windows: [] });
     expect(r.dimensions.some((d) => d.key === 'light')).toBe(false);
-    expect(r.dimensions.reduce((s, d) => s + d.max, 0)).toBe(70);
+    expect(r.dimensions.reduce((s, d) => s + d.max, 0)).toBe(76);
     // 其余维度都好，归一后仍是高分
     expect(r.total).toBeGreaterThanOrEqual(85);
   });
 
-  it('楼龄未知给中位分并写明', () => {
+  it('楼龄未知给一半并写明', () => {
     const r = scoreLivability({ ...good, builtYear: null });
-    const age = r.dimensions.find((d) => d.key === 'age');
-    expect(age?.score).toBe(8);
-    expect(age?.detail).toContain('未知');
+    const b = r.dimensions.find((d) => d.key === 'building');
+    expect(b?.score).toBe(5 + 5);
+    expect(b?.detail).toContain('未知');
   });
 
   it('每个维度的分数都不超过上限', () => {
@@ -124,7 +153,7 @@ describe('mainFacadeWindows', () => {
     const withAz = scoreLivability({ ...good, windows, windowAzimuths: az });
     const without = scoreLivability({ ...good, windows });
     const light = (l: typeof withAz) => l.dimensions.find((d) => d.key === 'light')?.score ?? 0;
-    expect(light(withAz)).toBeCloseTo(30, 0);
+    expect(light(withAz)).toBeGreaterThan(20);
     expect(light(withAz)).toBeGreaterThan(light(without) + 10);
   });
 });

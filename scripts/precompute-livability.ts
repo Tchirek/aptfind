@@ -7,9 +7,11 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { allEntrances } from '../src/app/entrances';
 import { livabilityOf } from '../src/app/livabilityFacts';
 import { decodeDistrict } from '../src/engine/district';
 import { buildSolids, buildWindowGrid, gridHash } from '../src/engine/geometry';
+import { MetroGraph } from '../src/engine/metro';
 import { decodeRegion } from '../src/engine/region';
 import { SunlightEngine } from '../src/engine/sunlight';
 import { snapPois, WalkGraph } from '../src/engine/walk';
@@ -41,7 +43,17 @@ for (let i = 0; i < grid.count; i++) {
 const engine = new SunlightEngine(buildSolids(district.buildings, undefined, district.terrain));
 const graph = new WalkGraph(region.walk);
 const pois = snapPois(graph, district.pois);
-const ctx = { district, grid, dahanMinutes, windowRange, engine, graph, pois };
+const ctx = {
+  district,
+  grid,
+  dahanMinutes,
+  windowRange,
+  engine,
+  graph,
+  pois,
+  metro: new MetroGraph(region),
+  entrances: allEntrances(graph, region, district.pois),
+};
 
 const t0 = performance.now();
 const scores: number[] = district.buildings.map(() => -1);
@@ -53,13 +65,14 @@ targets.forEach((b, k) => {
 });
 if (process.stderr.isTTY) process.stderr.write('\n');
 
+const got = scores.filter((s) => s >= 0).sort((a, b) => a - b);
+const q = (p: number) => got[Math.floor(p * (got.length - 1))] as number;
+// 屋顶色阶的节点：按片区实际分数的分位，五档颜色都落在真实存在的楼上
+const stops = [0.05, 0.25, 0.5, 0.75, 0.95].map(q);
 writeFileSync(
   new URL('livability.json', DATA),
-  `${JSON.stringify({ gridHash: meta.gridHash, scores })}\n`,
+  `${JSON.stringify({ gridHash: meta.gridHash, stops, scores })}\n`,
 );
-
-const got = scores.filter((s) => s >= 0).sort((a, b) => a - b);
-const q = (p: number) => got[Math.floor(p * (got.length - 1))];
 console.log(
   `${got.length} 栋住宅，用时 ${((performance.now() - t0) / 1000).toFixed(1)} s；` +
     `分数 最低 ${q(0)} · 四分位 ${q(0.25)} / ${q(0.5)} / ${q(0.75)} · 最高 ${q(1)}`,

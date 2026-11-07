@@ -32,8 +32,8 @@ export function LivabilityController({ data }: { data: SceneData }): null {
     let alive = true;
     setLivability(null);
 
-    Promise.all([getRegion(), getEngine()]).then(([{ graph, pois }, engine]) => {
-      const result = livabilityOf({ ...data, engine, graph, pois }, building);
+    Promise.all([getRegion(), getEngine()]).then(([{ graph, pois, metro, entrances }, engine]) => {
+      const result = livabilityOf({ ...data, engine, graph, pois, metro, entrances }, building);
       if (!result) return;
       const value: LivabilityResult = { ...result, building };
       cache.set(building, value);

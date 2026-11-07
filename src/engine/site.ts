@@ -83,3 +83,77 @@ export function greenDistance(d: District, x: number, y: number): number {
   }
   return Number.isFinite(best) ? best : Number.POSITIVE_INFINITY;
 }
+
+/** 到快速路、主干道、次干道（cls 0、1、2）各自最近的直线距离（米），maxMeters 外记 Infinity */
+export function roadDistances(
+  roads: readonly Road[],
+  x: number,
+  y: number,
+  maxMeters = 600,
+): [number, number, number] {
+  const out: [number, number, number] = [
+    Number.POSITIVE_INFINITY,
+    Number.POSITIVE_INFINITY,
+    Number.POSITIVE_INFINITY,
+  ];
+  for (const r of roads) {
+    if (r.cls > 2) continue;
+    const d = distanceToPolyline(x, y, r.points);
+    if (d <= maxMeters && d < (out[r.cls] as number)) out[r.cls] = d;
+  }
+  return out;
+}
+
+function ringArea(ring: Float64Array): number {
+  let a = 0;
+  const n = ring.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    a += (ring[2 * i] as number) * (ring[2 * j + 1] as number);
+    a -= (ring[2 * j] as number) * (ring[2 * i + 1] as number);
+  }
+  return Math.abs(a) / 2;
+}
+
+const footprints = new WeakMap<District, Float64Array>();
+
+/** 每栋楼的 [质心 x, 质心 y, 基底面积]，按 district 缓存 */
+function footprintTable(d: District): Float64Array {
+  let t = footprints.get(d);
+  if (!t) {
+    t = new Float64Array(d.buildings.length * 3);
+    d.buildings.forEach((b, i) => {
+      const [outer, ...holes] = b.rings;
+      if (!outer) return;
+      let cx = 0;
+      let cy = 0;
+      for (let k = 0; k < outer.length; k += 2) {
+        cx += outer[k] as number;
+        cy += outer[k + 1] as number;
+      }
+      const n = outer.length / 2;
+      (t as Float64Array).set(
+        [cx / n, cy / n, ringArea(outer) - holes.reduce((s, h) => s + ringArea(h), 0)],
+        3 * i,
+      );
+    });
+    footprints.set(d, t);
+  }
+  return t;
+}
+
+/**
+ * 以 (x, y) 为圆心、radius 为半径的圆里的建筑覆盖率：质心落在圆内的楼的基底面积之和 ÷ 圆面积。
+ * 老旧多层挤在一起时高，塔楼小区楼间留出大片空地时低。
+ */
+export function builtCoverage(d: District, x: number, y: number, radius = 150): number {
+  const t = footprintTable(d);
+  const r2 = radius * radius;
+  let sum = 0;
+  for (let i = 0; i < t.length; i += 3) {
+    const dx = (t[i] as number) - x;
+    const dy = (t[i + 1] as number) - y;
+    if (dx * dx + dy * dy <= r2) sum += t[i + 2] as number;
+  }
+  return Math.min(1, sum / (Math.PI * r2));
+}

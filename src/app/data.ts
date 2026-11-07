@@ -3,13 +3,14 @@
  * 以模块级 Promise 暴露，组件里用 React 19 的 use() 读取。
  */
 
-import { type District, loadDistrict, type Poi } from '../engine/district';
+import { type District, loadDistrict } from '../engine/district';
 import { buildSolids, buildWindowGrid, gridHash, type WindowGrid } from '../engine/geometry';
-import { type Entrance, snapEntrances } from '../engine/isochrone';
+import type { Entrance } from '../engine/isochrone';
 import { MetroGraph } from '../engine/metro';
 import { loadRegion, type Region } from '../engine/region';
 import { SunlightEngine } from '../engine/sunlight';
 import { type SnappedPoi, snapPois, WalkGraph } from '../engine/walk';
+import { allEntrances } from './entrances';
 
 export interface SceneData {
   district: District;
@@ -20,6 +21,8 @@ export interface SceneData {
   windowRange: Uint32Array;
   /** 预计算的宜居评分（核心区住宅），屋顶按它着色；没有为 −1 */
   roofScores: Int16Array;
+  /** 屋顶色阶的节点：片区分数的 5%、25%、50%、75%、95% 分位 */
+  roofStops: number[] | undefined;
 }
 
 interface SunlightMeta {
@@ -36,7 +39,11 @@ async function load(): Promise<SceneData> {
     fetch(`${base}data/sunlight-dahan.json`).then((r) => r.json() as Promise<SunlightMeta>),
     fetch(`${base}data/sunlight-dahan.bin`).then((r) => r.arrayBuffer()),
     fetch(`${base}data/livability.json`)
-      .then((r) => (r.ok ? (r.json() as Promise<{ gridHash: number; scores: number[] }>) : null))
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{ gridHash: number; scores: number[]; stops: number[] }>)
+          : null,
+      )
       .catch(() => null),
   ]);
   const grid = buildWindowGrid(district.buildings);
@@ -54,10 +61,12 @@ async function load(): Promise<SceneData> {
   }
   // 评分与日照出自同一份窗位网格才用，否则屋顶不着色
   const roofScores = new Int16Array(district.buildings.length).fill(-1);
+  let roofStops: number[] | undefined;
   if (liv && liv.gridHash === meta.gridHash && liv.scores.length === roofScores.length) {
     roofScores.set(liv.scores);
+    roofStops = liv.stops;
   }
-  return { district, grid, dahanMinutes, windowRange, roofScores };
+  return { district, grid, dahanMinutes, windowRange, roofScores, roofStops };
 }
 
 export const sceneData: Promise<SceneData> = load();
@@ -72,30 +81,7 @@ export async function getEngine(): Promise<SunlightEngine> {
   return engine;
 }
 
-/** '四川师大地铁站F口'、'四川师大(地铁站)' → '四川师大' */
-export function stationOfPoi(name: string): string | null {
-  const m = name.match(/^(.+?)(?:地铁站|\(地铁站\)|（地铁站）)/);
-  return m ? (m[1] as string) : null;
-}
-
-/** 片区里的地铁出入口以高德为准（比 OSM 全），并到对应车站上 */
-export function districtEntrances(
-  graph: WalkGraph,
-  region: Region,
-  pois: readonly Poi[],
-): Entrance[] {
-  const index = new Map(region.stations.map((s, i) => [s.name, i]));
-  const out: Entrance[] = [];
-  for (const p of pois) {
-    if (p.category !== 'metro') continue;
-    const name = stationOfPoi(p.name);
-    const station = name === null ? undefined : index.get(name);
-    if (station === undefined) continue;
-    const { node, distance } = graph.nearest(p.x, p.y);
-    if (node >= 0 && distance <= 250) out.push({ station, node, snap: distance });
-  }
-  return out;
-}
+export { districtEntrances, stationOfPoi } from './entrances';
 
 export interface RegionData {
   region: Region;
@@ -119,7 +105,7 @@ export function getRegion(): Promise<RegionData> {
           region: r,
           graph,
           metro: new MetroGraph(r),
-          entrances: [...snapEntrances(graph, r), ...districtEntrances(graph, r, district.pois)],
+          entrances: allEntrances(graph, r, district.pois),
           pois: snapPois(graph, district.pois),
         };
       },
