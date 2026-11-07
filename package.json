@@ -19,6 +19,7 @@
     "node": ">=22.12"
   },
   "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.3.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "comlink": "^4.4.2",
