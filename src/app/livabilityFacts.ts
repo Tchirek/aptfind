@@ -8,7 +8,7 @@
 
 import type { District, Poi } from '../engine/district';
 import { floorsOf, type WindowGrid, wallAzimuth } from '../engine/geometry';
-import { computeIsochrone, type Entrance } from '../engine/isochrone';
+import type { Entrance } from '../engine/isochrone';
 import { type Livability, scoreLivability } from '../engine/livability';
 import type { MetroGraph } from '../engine/metro';
 import { builtCoverage, greenDistance, roadDistances } from '../engine/site';
@@ -33,6 +33,8 @@ export interface LivabilityContext {
   pois: readonly SnappedPoi[];
   metro: MetroGraph;
   entrances: readonly Entrance[];
+  /** 每个车站经过的线路（engine/region 的 stationLines） */
+  stationLines: readonly (readonly number[])[];
 }
 
 function centroid(ring: Float64Array): [number, number] {
@@ -91,6 +93,73 @@ function windowView(ctx: LivabilityContext, b: number): { openness: number; spac
   return { openness: sum / samples, spacing: fronts[Math.floor(fronts.length / 2)] as number };
 }
 
+/** 点到多边形外轮廓的距离；在里面为 0 */
+function distToRing(ring: Float64Array, x: number, y: number): number {
+  let inside = false;
+  let best = Number.POSITIVE_INFINITY;
+  const n = ring.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const ax = ring[2 * j] as number;
+    const ay = ring[2 * j + 1] as number;
+    const bx = ring[2 * i] as number;
+    const by = ring[2 * i + 1] as number;
+    if (by > y !== ay > y && x < ((ax - bx) * (y - by)) / (ay - by) + bx) inside = !inside;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 === 0 ? 0 : Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / l2));
+    best = Math.min(best, Math.hypot(x - ax - dx * t, y - ay - dy * t));
+  }
+  return inside ? 0 : best;
+}
+
+/** 楼外 radius 米内的餐饮家数（底商） */
+function adjacentFood(d: District, ring: Float64Array, radius = 30): number {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < ring.length; i += 2) {
+    minX = Math.min(minX, ring[i] as number);
+    maxX = Math.max(maxX, ring[i] as number);
+    minY = Math.min(minY, ring[i + 1] as number);
+    maxY = Math.max(maxY, ring[i + 1] as number);
+  }
+  let n = 0;
+  for (const p of d.pois) {
+    if (p.category !== 'food') continue;
+    if (p.x < minX - radius || p.x > maxX + radius || p.y < minY - radius || p.y > maxY + radius)
+      continue;
+    if (distToRing(ring, p.x, p.y) <= radius) n++;
+  }
+  return n;
+}
+
+/** 小区的物业费、绿化率、容积率、物业公司；小区没有就看上级地块 */
+function propertyOf(d: District, compound: number) {
+  const c = d.compounds[compound];
+  const parent = c && c.parent >= 0 ? d.compounds[c.parent] : undefined;
+  const pick = <K extends 'propertyFee' | 'greenRatio' | 'plotRatio' | 'propertyCompany'>(k: K) =>
+    c?.[k] ?? parent?.[k] ?? null;
+  return {
+    fee: pick('propertyFee'),
+    green: pick('greenRatio'),
+    plotRatio: pick('plotRatio'),
+    company: pick('propertyCompany'),
+  };
+}
+
+/** 步行 15 分钟内能走到出入口的车站，一共经过几条不同的线 */
+function linesWithinWalk(ctx: LivabilityContext, access: Access, minutes = 15): number {
+  const lines = new Set<number>();
+  for (const e of ctx.entrances) {
+    const d = (access.paths.dist[e.node] as number) + e.snap;
+    if (minutesOf(d) > minutes) continue;
+    for (const l of ctx.stationLines[e.station] ?? []) lines.add(l);
+  }
+  return lines.size;
+}
+
 export function livabilityOf(ctx: LivabilityContext, building: number): Livability | null {
   const b = ctx.district.buildings[building];
   if (!b) return null;
@@ -112,14 +181,13 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
       ? Number.POSITIVE_INFINITY
       : minutesOf(meters);
   };
-  const iso = computeIsochrone(ctx.graph, ctx.metro, ctx.entrances, doors);
   const view = windowView(ctx, building);
 
   return scoreLivability({
     windows,
     windowAzimuths,
     metroMinutes: minutes('metro'),
-    reachStations: iso.stations.length,
+    metroLines: linesWithinWalk(ctx, access),
     busMinutes: minutes('bus'),
     groceryMinutes: minutes('grocery'),
     marketMinutes: minutes('market'),
@@ -140,5 +208,7 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
     floors: floorsOf(b.height),
     floorsEstimated: b.source === 'cbmf' || b.source === 'plan',
     builtYear: builtYearOf(ctx.district, b.compound),
+    foodAdjacent: adjacentFood(ctx.district, ring),
+    property: propertyOf(ctx.district, b.compound),
   });
 }

@@ -122,3 +122,15 @@ export async function loadRegion(url: string): Promise<Region> {
   if (!res.ok) throw new Error(`加载 ${url} 失败：${res.status}`);
   return decodeRegion((await res.json()) as RegionJson);
 }
+
+/** 每个车站有哪几条线经过（线路下标） */
+export function stationLines(region: Region): number[][] {
+  const out = region.stations.map(() => new Set<number>());
+  region.lines.forEach((line, li) => {
+    for (const s of line.segments) {
+      out[s.a]?.add(li);
+      out[s.b]?.add(li);
+    }
+  });
+  return out.map((s) => [...s]);
+}

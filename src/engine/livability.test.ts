@@ -4,7 +4,7 @@ import { type LivabilityFacts, logRatio, mainFacadeWindows, scoreLivability } fr
 const good: LivabilityFacts = {
   windows: [300, 320, 280, 260, 300, 320, 290, 310],
   metroMinutes: 3,
-  reachStations: 34,
+  metroLines: 3,
   busMinutes: 2,
   groceryMinutes: 2,
   marketMinutes: 4,
@@ -20,12 +20,14 @@ const good: LivabilityFacts = {
   roads: [Number.POSITIVE_INFINITY, 300, 300],
   floors: 18,
   builtYear: 2022,
+  foodAdjacent: 0,
+  property: { fee: 3, green: 45, plotRatio: 2, company: '某物业' },
 };
 
 const bad: LivabilityFacts = {
   windows: [20, 30, 10, 0, 40, 20, 15, 5],
   metroMinutes: 31,
-  reachStations: 2,
+  metroLines: 0,
   busMinutes: Number.POSITIVE_INFINITY,
   groceryMinutes: 24,
   marketMinutes: Number.POSITIVE_INFINITY,
@@ -41,6 +43,8 @@ const bad: LivabilityFacts = {
   roads: [20, 5, 5],
   floors: 6,
   builtYear: 1985,
+  foodAdjacent: 0,
+  property: { fee: 0.8, green: 20, plotRatio: 5, company: null },
 };
 
 describe('logRatio', () => {
@@ -70,7 +74,7 @@ describe('scoreLivability', () => {
     expect(r.total).toBeGreaterThanOrEqual(85);
     expect(r.tone).toBe('good');
     expect(r.penalties).toHaveLength(0);
-    expect(r.dimensions).toHaveLength(6);
+    expect(r.dimensions).toHaveLength(7);
   });
 
   it('条件差的楼分数低，临快速路扣得最多且不超过上限', () => {
@@ -87,13 +91,13 @@ describe('scoreLivability', () => {
     const open = scoreLivability({ ...good, windows: [300, 300, 300, 300, 300] });
     const shaded = scoreLivability({ ...good, windows: [0, 0, 300, 300, 300] });
     const light = (l: typeof open) => l.dimensions.find((d) => d.key === 'light')?.score ?? 0;
-    expect(light(open) - light(shaded)).toBeGreaterThan(8);
+    expect(light(open) - light(shaded)).toBeGreaterThan(4);
   });
 
   it('同样条件下，7 层以上有电梯比 6 层多层分高', () => {
     const b = (f: number) =>
       scoreLivability({ ...good, floors: f }).dimensions.find((d) => d.key === 'building');
-    expect((b(18)?.score ?? 0) - (b(6)?.score ?? 0)).toBeCloseTo(4, 5);
+    expect((b(18)?.score ?? 0) - (b(6)?.score ?? 0)).toBeCloseTo(3.2, 5);
     expect(b(6)?.facts).toContainEqual({ label: '电梯', value: '无' });
   });
 
@@ -101,13 +105,13 @@ describe('scoreLivability', () => {
     const env = (f: Partial<LivabilityFacts>) =>
       scoreLivability({ ...good, ...f }).dimensions.find((d) => d.key === 'environment')?.score ??
       0;
-    expect(env({}) - env({ spacing: 12, coverage: 0.45 })).toBeGreaterThan(7);
+    expect(env({}) - env({ spacing: 12, coverage: 0.45 })).toBeGreaterThan(6);
   });
 
   it('没有窗位时不含采光一项，按其余维度归一', () => {
     const r = scoreLivability({ ...good, windows: [] });
     expect(r.dimensions.some((d) => d.key === 'light')).toBe(false);
-    expect(r.dimensions.reduce((s, d) => s + d.max, 0)).toBe(76);
+    expect(r.dimensions.reduce((s, d) => s + d.max, 0)).toBe(78);
     // 其余维度都好，归一后仍是高分
     expect(r.total).toBeGreaterThanOrEqual(85);
   });
@@ -115,7 +119,7 @@ describe('scoreLivability', () => {
   it('楼龄未知给一半并写明', () => {
     const r = scoreLivability({ ...good, builtYear: null });
     const b = r.dimensions.find((d) => d.key === 'building');
-    expect(b?.score).toBe(5 + 5);
+    expect(b?.score).toBe(4 + 4);
     expect(b?.detail).toContain('未知');
   });
 
@@ -153,7 +157,31 @@ describe('mainFacadeWindows', () => {
     const withAz = scoreLivability({ ...good, windows, windowAzimuths: az });
     const without = scoreLivability({ ...good, windows });
     const light = (l: typeof withAz) => l.dimensions.find((d) => d.key === 'light')?.score ?? 0;
-    expect(light(withAz)).toBeGreaterThan(20);
-    expect(light(withAz)).toBeGreaterThan(light(without) + 10);
+    expect(light(withAz)).toBeGreaterThan(17);
+    expect(light(withAz)).toBeGreaterThan(light(without) + 7);
+  });
+});
+
+describe('物业与底商', () => {
+  it('物业费高、绿化好、容积率低的小区物业分高；查不到的给一半', () => {
+    const q = (property: LivabilityFacts['property']) =>
+      scoreLivability({ ...good, property }).dimensions.find((d) => d.key === 'quality')?.score ??
+      0;
+    const top = q({ fee: 3.2, green: 50, plotRatio: 1.3, company: '万科物业' });
+    const low = q({ fee: 1, green: 30, plotRatio: 2.8, company: '私人承办' });
+    const unknown = q({ fee: null, green: null, plotRatio: null, company: null });
+    expect(top).toBeGreaterThan(12);
+    expect(low).toBeLessThan(6);
+    expect(unknown).toBeCloseTo(7, 5);
+  });
+
+  it('楼下一排饭馆扣分，十分钟内餐饮再多也不加分', () => {
+    const r = scoreLivability({ ...good, foodAdjacent: 10 });
+    expect(r.penalties.find((p) => p.label === '油烟与夜宵噪声')?.points).toBeCloseTo(3, 5);
+    const a = (n: number) =>
+      scoreLivability({ ...good, within10: { ...good.within10, food: n } }).dimensions.find(
+        (d) => d.key === 'amenity',
+      )?.score ?? 0;
+    expect(a(300)).toBeCloseTo(a(80), 5);
   });
 });

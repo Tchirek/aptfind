@@ -8,7 +8,7 @@ import { type District, loadDistrict } from '../engine/district';
 import { buildSolids, buildWindowGrid, gridHash, type WindowGrid } from '../engine/geometry';
 import type { Entrance } from '../engine/isochrone';
 import { MetroGraph } from '../engine/metro';
-import { loadRegion, type Region } from '../engine/region';
+import { loadRegion, type Region, stationLines } from '../engine/region';
 import { SunlightEngine } from '../engine/sunlight';
 import { type SnappedPoi, snapPois, WalkGraph } from '../engine/walk';
 import { allEntrances } from './entrances';
@@ -92,6 +92,8 @@ export interface RegionData {
   entrances: Entrance[];
   /** 片区设施吸附到步行网 */
   pois: SnappedPoi[];
+  /** 每个车站经过的线路 */
+  stationLines: number[][];
 }
 
 let region: Promise<RegionData> | null = null;
@@ -109,6 +111,7 @@ export function getRegion(): Promise<RegionData> {
           metro: new MetroGraph(r),
           entrances: allEntrances(graph, r, district.pois),
           pois: snapPois(graph, district.pois),
+          stationLines: stationLines(r),
         };
       },
     );

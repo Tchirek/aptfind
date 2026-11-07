@@ -13,7 +13,7 @@ import { Barriers, barrierSegments } from '../src/engine/barriers';
 import { decodeDistrict } from '../src/engine/district';
 import { buildSolids, buildWindowGrid, gridHash } from '../src/engine/geometry';
 import { MetroGraph } from '../src/engine/metro';
-import { decodeRegion } from '../src/engine/region';
+import { decodeRegion, stationLines } from '../src/engine/region';
 import { SunlightEngine } from '../src/engine/sunlight';
 import { snapPois, WalkGraph } from '../src/engine/walk';
 
@@ -55,6 +55,7 @@ const ctx = {
   pois,
   metro: new MetroGraph(region),
   entrances: allEntrances(graph, region, district.pois),
+  stationLines: stationLines(region),
 };
 
 const t0 = performance.now();
