@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { getEngine, type SceneData } from '../app/data';
 import { builtLabel, formatClock, formatDuration, windowOrientation } from '../app/format';
 import { usePhoto } from '../app/photos';
@@ -19,11 +19,36 @@ import { Timeline } from './Timeline';
 import { SHEET_QUERY, useMedia } from './useMedia';
 import { ViewSection } from './ViewSection';
 
-function heightNote(b: Building): string {
-  const floors = floorsOf(b.height);
-  if (b.source === 'survey') return `${floors} 层 · 已核实`;
-  if (b.source === 'user') return `${floors} 层 · 已修改`;
-  return `${floors} 层 · 约 ${Math.round(b.height)} m`;
+/** 遥感反演或按户数推算的楼高，层数前加一个小小的 ~ */
+export const floorsEstimated = (b: Building) => b.source === 'cbmf' || b.source === 'plan';
+
+function Floors({ b }: { b: Building }) {
+  return (
+    <>
+      {floorsEstimated(b) && <span className="approx">~</span>}
+      {floorsOf(b.height)} 层
+    </>
+  );
+}
+
+function heightNote(b: Building): ReactNode {
+  if (b.source === 'survey')
+    return (
+      <>
+        <Floors b={b} /> · 已核实
+      </>
+    );
+  if (b.source === 'user')
+    return (
+      <>
+        <Floors b={b} /> · 已修改
+      </>
+    );
+  return (
+    <>
+      <Floors b={b} /> · {Math.round(b.height)} m
+    </>
+  );
 }
 
 function builtYear(d: District, k: number): number | null {
@@ -67,7 +92,7 @@ function Head({
 }: {
   eyebrow: string;
   title: string;
-  sub?: string;
+  sub?: ReactNode;
   /** 从窗位回到整栋楼 */
   back?: () => void;
   /** 题图按这些地块名依次找 */
@@ -210,7 +235,11 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
             .filter(Boolean)
             .join(' · ')}
           title={title}
-          sub={`${windowOrientation(data.grid, index)} · ${floor} 层 / 共 ${floorsOf(b.height)} 层`}
+          sub={
+            <>
+              {windowOrientation(data.grid, index)} · {floor} 层 / 共 <Floors b={b} />
+            </>
+          }
           back={() => select({ kind: 'building', index: b.index })}
           photo={photoNames(d, b.compound)}
         />
@@ -246,7 +275,13 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
                     {formatClock(result?.path.beijingAt(s.to) ?? s.to)}
                   </span>
                   <span>
-                    {ob ? `${buildingTitle(d, ob).title} · ${floorsOf(ob.height)} 层` : '山体'}
+                    {ob ? (
+                      <>
+                        {buildingTitle(d, ob).title} · <Floors b={ob} />
+                      </>
+                    ) : (
+                      '山体'
+                    )}
                   </span>
                 </li>
               );

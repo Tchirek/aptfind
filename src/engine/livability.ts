@@ -108,6 +108,8 @@ export interface LivabilityFacts {
   roads: readonly [number, number, number];
   /** 地上层数 */
   floors: number;
+  /** 层数是推算的（遥感或按户数），界面上加 ~ */
+  floorsEstimated?: boolean;
   /** 建成年代；null 表示未知 */
   builtYear: number | null;
 }
@@ -288,7 +290,7 @@ function buildingDimension(facts: LivabilityFacts): Dimension {
   }
   const has = hasLift(facts.floors, facts.builtYear);
   const lift = has ? 5 : facts.floors <= 3 ? 3.5 : has === null ? 3 : 1;
-  out.push({ label: '层数', value: `${facts.floors} 层` });
+  out.push({ label: '层数', value: `${facts.floorsEstimated ? '~' : ''}${facts.floors} 层` });
   out.push({
     label: '电梯',
     value: has ? '有' : facts.floors <= 3 ? '低层不需' : has === null ? '—' : '无',

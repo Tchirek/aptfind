@@ -8,7 +8,16 @@ function Facts({ facts }: { facts: Fact[] }) {
       {facts.map((f) => (
         <div key={f.label}>
           <dt>{f.label}</dt>
-          <dd className="mono">{f.value}</dd>
+          <dd className="mono">
+            {f.value.startsWith('~') ? (
+              <>
+                <span className="approx">~</span>
+                {f.value.slice(1)}
+              </>
+            ) : (
+              f.value
+            )}
+          </dd>
         </div>
       ))}
     </dl>

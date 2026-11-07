@@ -138,6 +138,7 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
     coverage: builtCoverage(ctx.district, x, y),
     roads: roadDistances(ctx.district.roads, x, y),
     floors: floorsOf(b.height),
+    floorsEstimated: b.source === 'cbmf' || b.source === 'plan',
     builtYear: builtYearOf(ctx.district, b.compound),
   });
 }
