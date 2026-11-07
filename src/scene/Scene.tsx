@@ -14,6 +14,7 @@ import { Labels } from './Labels';
 import { Overlays } from './Overlays';
 import { Reach } from './Reach';
 import { Sun } from './Sun';
+import { TouchGestures } from './TouchGestures';
 import { Viewshed } from './Viewshed';
 
 /**
@@ -72,6 +73,7 @@ export function Scene({ data }: { data: SceneData }) {
         screenSpacePanning={false}
       />
       <CameraRig />
+      <TouchGestures />
       <CameraFit />
       <Labels district={data.district} />
       {import.meta.env.DEV && <DevHandle />}
