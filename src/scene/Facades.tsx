@@ -100,8 +100,9 @@ export function Facades({ data }: { data: SceneData }) {
     }
   }, [geometry, grid, start, building, sunlight]);
 
-  const [hover, setHover] = useState<number | null>(null);
-  useEffect(() => setHover(null), [building]);
+  // 悬停记下是哪栋楼的窗，换了楼自然作废
+  const [hovered, setHover] = useState<{ building: number | null; index: number } | null>(null);
+  const hover = hovered && hovered.building === building ? hovered.index : null;
 
   const selectedWindow = selection?.kind === 'window' ? selection.index : null;
   const frame = useMemo(
@@ -139,7 +140,8 @@ export function Facades({ data }: { data: SceneData }) {
         onClick={onClick}
         onPointerMove={(e) => {
           e.stopPropagation();
-          setHover(toWindow(e));
+          const i = toWindow(e);
+          setHover(i === null ? null : { building, index: i });
           document.body.style.cursor = 'pointer';
         }}
         onPointerOut={() => {
