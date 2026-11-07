@@ -32,6 +32,15 @@ export interface Trail {
   times: Float32Array;
 }
 
+export interface ReachStation {
+  name: string;
+  x: number;
+  y: number;
+  exit: number;
+  /** 依次乘坐的线路，如 ["7号线", "2号线"]，与各自的标志色 */
+  lines: { name: string; colour: string }[];
+}
+
 export interface ReachPayload {
   near: PackedField | null;
   far: PackedField | null;
@@ -39,7 +48,7 @@ export interface ReachPayload {
   area15: number;
   area30: number;
   /** 坐地铁能在 30 分钟内出站的车站 */
-  stations: { name: string; x: number; y: number; exit: number }[];
+  stations: ReachStation[];
   trails: Trail[];
   budget: number;
 }
@@ -140,7 +149,16 @@ const api = {
       area30: farGrid && farField ? reachableArea(farField, farGrid, 1, budget) : 0,
       stations: iso.stations.map((s) => {
         const st = region.stations[s.station];
-        return { name: st?.name ?? '', x: st?.x ?? 0, y: st?.y ?? 0, exit: s.exit };
+        return {
+          name: st?.name ?? '',
+          x: st?.x ?? 0,
+          y: st?.y ?? 0,
+          exit: s.exit,
+          lines: s.lines.map((l) => ({
+            name: region.lines[l]?.name ?? '',
+            colour: region.lines[l]?.colour ?? '#888',
+          })),
+        };
       }),
       trails: trails.filter((t) => t.times.length > 1),
       budget,

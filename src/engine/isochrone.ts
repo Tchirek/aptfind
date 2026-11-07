@@ -37,6 +37,8 @@ export interface ReachedStation {
   arrival: number;
   /** 出站到地面的时刻 */
   exit: number;
+  /** 依次乘坐的线路（MetroGraph 里的线路下标） */
+  lines: number[];
 }
 
 export interface Isochrone {
@@ -80,7 +82,7 @@ export function computeIsochrone(
     // 直接走过去更快的站（包括上车站本身）不算"坐地铁到的"
     const walkThere = (boards[station] as number) - p.board;
     if (walkThere <= exit) return;
-    stations.push({ station, arrival: t, exit });
+    stations.push({ station, arrival: t, exit, lines: ride.lines[station] ?? [] });
   });
   for (const e of entrances) {
     const t = (ride.arrival[e.station] as number) + p.exit;

@@ -24,6 +24,8 @@ export interface RideResult {
   arrival: Float64Array;
   /** 最短路树上用到的区间，画乘车轨迹用 */
   legs: RideLeg[];
+  /** 到各站最快的那条路依次坐过的线路（换乘几次就有几条），到不了为空 */
+  lines: number[][];
 }
 
 interface Edge {
@@ -143,6 +145,15 @@ export class MetroGraph {
       }
     }
     legs.sort((a, b) => a.depart - b.depart);
-    return { arrival, legs };
+
+    const lines = Array.from(best, (id) => {
+      const seq: number[] = [];
+      for (let u = id; u >= 0; u = prev[u] as number) {
+        const line = via[2 * u] as number;
+        if (line >= 0 && seq[seq.length - 1] !== line) seq.push(line);
+      }
+      return seq.reverse();
+    });
+    return { arrival, legs, lines };
   }
 }

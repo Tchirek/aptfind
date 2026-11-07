@@ -46,9 +46,9 @@
 .reach-station-tag {
   font-size: 12px;
   line-height: 1;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 2px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  padding: 3px 6px;
   white-space: nowrap;
 }
 

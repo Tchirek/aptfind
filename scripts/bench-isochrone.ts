@@ -1,7 +1,13 @@
 /** 用真实数据跑一次可达范围，看耗时与结果是否合理：npx tsx scripts/bench-isochrone.ts [楼名关键字] */
 import { readFileSync } from 'node:fs';
 import { decodeDistrict } from '../src/engine/district';
-import { computeIsochrone, fieldGrid, rasterizeField, reachableArea, snapEntrances } from '../src/engine/isochrone';
+import {
+  computeIsochrone,
+  fieldGrid,
+  rasterizeField,
+  reachableArea,
+  snapEntrances,
+} from '../src/engine/isochrone';
 import { MetroGraph } from '../src/engine/metro';
 import { decodeRegion } from '../src/engine/region';
 import { buildingDoors, WalkGraph } from '../src/engine/walk';
@@ -9,7 +15,9 @@ import { buildingDoors, WalkGraph } from '../src/engine/walk';
 const district = decodeDistrict(JSON.parse(readFileSync('public/data/district.json', 'utf8')));
 const region = decodeRegion(JSON.parse(readFileSync('public/data/region.json', 'utf8')));
 const key = process.argv[2] ?? '图书馆';
-const b = district.buildings.find((x) => x.label?.includes(key) && x.core) ?? district.buildings.find((x) => x.core);
+const b =
+  district.buildings.find((x) => x.label?.includes(key) && x.core) ??
+  district.buildings.find((x) => x.core);
 if (!b) throw new Error('no building');
 
 let t = performance.now();
@@ -28,7 +36,12 @@ const iso = computeIsochrone(graph, metro, entrances, doors);
 lap('等时计算');
 const cx = (b.rings[0] as Float64Array)[0] as number;
 const cy = (b.rings[0] as Float64Array)[1] as number;
-const near = fieldGrid(graph, iso.combined, 30, { margin: 200, maxCells: 1100, minCell: 4, around: [cx, cy, 2700] });
+const near = fieldGrid(graph, iso.combined, 30, {
+  margin: 200,
+  maxCells: 1100,
+  minCell: 4,
+  around: [cx, cy, 2700],
+});
 const far = fieldGrid(graph, iso.combined, 30, { margin: 300, maxCells: 1400, minCell: 8 });
 lap('网格');
 if (!near || !far) throw new Error('no grid');
@@ -40,5 +53,15 @@ console.log(b.label, '出入口', doors.length);
 console.log('15 分钟步行面积', (reachableArea(nf, near, 0, 15) / 1e6).toFixed(2), 'km²');
 console.log('30 分钟步行面积', (reachableArea(nf, near, 0, 30) / 1e6).toFixed(2), 'km²');
 console.log('30 分钟步行+地铁面积', (reachableArea(ff, far, 1, 30) / 1e6).toFixed(2), 'km²');
-console.log('出站车站', iso.stations.length, iso.stations.slice(0, 40).map((s) => `${region.stations[s.station]?.name} ${s.exit.toFixed(1)}`).join('，'));
+console.log(
+  '出站车站',
+  iso.stations.length,
+  iso.stations
+    .slice(0, 40)
+    .map(
+      (s) =>
+        `${region.stations[s.station]?.name} ${s.exit.toFixed(1)}(${s.lines.map((l) => region.lines[l]?.ref).join('>')})`,
+    )
+    .join('，'),
+);
 console.log('乘车区间', iso.legs.length);
