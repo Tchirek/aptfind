@@ -1,10 +1,11 @@
-"""生成狮子山片区的场景数据 public/data/district.json（v2）。
+"""生成狮子山片区的场景数据 public/data/district.json（v3）。
 
 数据来源：
 - 建筑轮廓与高度：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），
   高度来自 3D-GloBFP 遥感反演，可用 survey.csv 的实地层数覆盖。
 - 地形：Copernicus DEM GLO-30，经去建筑处理（见 terrain.py）。
-- 道路、步行网、小区与校园边界、水系、地铁出入口：OpenStreetMap（ODbL），经 Overpass API 获取。
+- 道路、小区与校园边界、水系、地铁出入口：OpenStreetMap（ODbL），经 Overpass API 获取。
+  步行网与地铁网在 build_region.py 里另行生成（region.json）。
 - 地名（小区 AOI、校内建筑）与生活设施：高德开放平台，由 tools/amap.html 在本地采集。
 
 用法：
@@ -42,7 +43,6 @@ from shapely.strtree import STRtree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import amap  # noqa: E402
-import network  # noqa: E402
 import terrain  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -660,10 +660,6 @@ def main() -> None:
             name = tags.get("name") or (f'{tags["ref"]}口' if tags.get("ref") else "地铁出入口")
             pois.append({"n": name, "c": "metro", "p": [dm(float(x)), dm(float(y))]})
 
-    # ---------------- 步行网
-    minx, miny, maxx, maxy = outer_local.bounds
-    net = network.build_network(elements, xy_local, (minx - 400, miny - 400, maxx + 400, maxy + 400))
-
     # ---------------- 道路
     road_lines: list[tuple[int, LineString, dict]] = []
     for el in elements:
@@ -688,13 +684,13 @@ def main() -> None:
     attribution = [
         "建筑：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），高度源自 3D-GloBFP",
         terrain.ATTRIBUTION,
-        "道路、步行网、边界、水系：© OpenStreetMap contributors（ODbL）",
+        "道路、步行网、地铁线路、边界、水系：© OpenStreetMap contributors（ODbL）",
     ]
     if regeo or pois:
         attribution.append(amap.ATTRIBUTION)
 
     out = {
-        "version": 2,
+        "version": 3,
         "origin": {"lat": ORIGIN_LAT, "lon": ORIGIN_LON},
         "projection": LOCAL_PROJ,
         "unit": "dm",
@@ -739,11 +735,6 @@ def main() -> None:
         "roads": roads,
         "water": water,
         "pois": pois,
-        "network": {
-            "n": [dm(v) for v in net["nodes"].ravel()],
-            "e": [int(v) for v in net["edges"].ravel()],
-            "s": [int(i) for i in np.nonzero(net["steps"])[0]],
-        },
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -798,7 +789,7 @@ def main() -> None:
     print(
         f"建筑 {len(buildings)} 栋（核心区 {n_core}，归入小区/校园 {named_core}，有单栋名称 {labelled}）；"
         f"剔除 {dict(dropped)}；小区与校园 {len(compounds)} 个（推算范围 {sum(c['source'] == 'derived' for c in compounds)}）；"
-        f"设施 {len(pois)}（{dict(Counter(p['c'] for p in pois))}）；步行网 {len(net['nodes'])} 节点 {len(net['edges'])} 边；"
+        f"设施 {len(pois)}（{dict(Counter(p['c'] for p in pois))}）；"
         f"水面 {len(water_polys)} 块、水道 {len(water_lines)} 条；地形 {grid.z.shape[1]}×{grid.z.shape[0]}，"
         f"高差 {np.nanmax(grid.z):.1f} m",
         file=sys.stderr,

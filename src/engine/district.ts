@@ -1,5 +1,6 @@
 /**
- * 场景数据：解码 pipeline/build_district.py 生成的 district.json（v2）。
+ * 场景数据：解码 pipeline/build_district.py 生成的 district.json（v3）。
+ * 步行网与地铁网在 region.json 里（见 region.ts）。
  *
  * 坐标一律是以片区中心为原点的平面坐标（米），x 指东、y 指北、z 指天顶；
  * 高程 z 相对片区最低地面（terrain.base 为其海拔）。
@@ -117,11 +118,10 @@ export interface District {
   roads: Road[];
   water: Water[];
   pois: Poi[];
-  network: WalkNetwork;
 }
 
 interface DistrictJson {
-  version: 2;
+  version: 3;
   origin: { lat: number; lon: number };
   unit: 'dm';
   core: [number, number, number, number];
@@ -159,14 +159,13 @@ interface DistrictJson {
   roads: { n: string | null; c: number; b: 0 | 1; p: number[] }[];
   water: ({ r: number[] } | { l: number[]; w: number })[];
   pois: { n: string; c: PoiCategory; p: [number, number] }[];
-  network: { n: number[]; e: number[]; s: number[] };
 }
 
 const DM = 0.1;
 const decode = (a: number[]) => Float64Array.from(a, (v) => v * DM);
 
 export function decodeDistrict(json: DistrictJson): District {
-  if (json.version !== 2 || json.unit !== 'dm') throw new Error('district.json 版本不受支持');
+  if (json.version !== 3 || json.unit !== 'dm') throw new Error('district.json 版本不受支持');
   const [minX, minY, maxX, maxY] = json.core.map((v) => v * DM) as [number, number, number, number];
   const t = json.terrain;
   return {
@@ -216,11 +215,6 @@ export function decodeDistrict(json: DistrictJson): District {
         : { ring: null, line: decode(w.l), width: w.w },
     ),
     pois: json.pois.map((p) => ({ name: p.n, category: p.c, x: p.p[0] * DM, y: p.p[1] * DM })),
-    network: {
-      nodes: decode(json.network.n),
-      edges: Uint32Array.from(json.network.e),
-      steps: new Set(json.network.s),
-    },
   };
 }
 
