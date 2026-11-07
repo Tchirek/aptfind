@@ -109,6 +109,28 @@ def load_pois(raw: Path) -> list[Poi]:
     return out
 
 
+# 指名标出的连锁品牌：类别名 → 店名须以它开头（排除"甜品站""取餐点"与以公司名登记的重复点）
+BRANDS = {"mcdonalds": "麦当劳", "starbucks": "星巴克", "haidilao": "海底捞"}
+BRAND_EXCLUDE = re.compile(r"(甜品站|取餐点|外送|外卖)")
+
+
+def load_brands(raw: Path) -> list[Poi]:
+    f = raw / "poi-brands.json"
+    if not f.exists():
+        return []
+    out: list[Poi] = []
+    seen: set[str] = set()
+    for p in json.loads(f.read_text(encoding="utf-8")):
+        name = p["name"]
+        cat = next((k for k, v in BRANDS.items() if name.startswith(v)), None)
+        if cat is None or BRAND_EXCLUDE.search(name) or p["id"] in seen:
+            continue
+        seen.add(p["id"])
+        lon, lat = parse_location(p["location"])
+        out.append(Poi(cat, name, p.get("type", ""), lon, lat))
+    return out
+
+
 def load_named_places(raw: Path) -> list[Poi]:
     """校园内部设施与楼宇类 POI：用于给单栋楼起名"""
     out: list[Poi] = []

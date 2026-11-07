@@ -332,6 +332,16 @@ button {
 }
 .access-kind {
   color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.brand-logo {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  align-self: center;
 }
 .access-name {
   overflow: hidden;

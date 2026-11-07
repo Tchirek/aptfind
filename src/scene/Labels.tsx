@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { Matrix4, Vector3 } from 'three';
 import { stationOfPoi } from '../app/data';
-import { type District, terrainAt } from '../engine/district';
+import { BRAND_CATEGORIES, type District, terrainAt } from '../engine/district';
 import { isCampus } from './groundTexture';
 import { sceneUniforms } from './lighting';
 
@@ -23,7 +23,9 @@ interface PointLabel {
   /** 镜头离目标点小于它才显示 */
   maxDistance: number;
   priority: number;
-  style: 'campus' | 'place' | 'building' | 'station';
+  style: 'campus' | 'place' | 'building' | 'station' | 'brand';
+  /** 品牌徽标（public/brands/ 下的文件名） */
+  logo?: string;
 }
 
 /** 道路上较直的一段 */
@@ -171,6 +173,22 @@ function buildLabels(d: District): { points: PointLabel[]; roads: RoadLabel[] } 
     });
   }
 
+  // 麦当劳、星巴克、海底捞：画品牌徽标
+  for (const p of d.pois) {
+    if (!(BRAND_CATEGORIES as readonly string[]).includes(p.category)) continue;
+    points.push({
+      key: `p${p.category}${p.x.toFixed(0)},${p.y.toFixed(0)}`,
+      text: p.name,
+      x: p.x,
+      y: p.y,
+      z: terrainAt(d.terrain, p.x, p.y) + 8,
+      maxDistance: 3600,
+      priority: 88,
+      style: 'brand',
+      logo: p.category,
+    });
+  }
+
   const byName = new Map<string, RoadLabel>();
   for (const r of d.roads) {
     if (!r.name) continue;
@@ -238,6 +256,19 @@ export function Labels({ district }: { district: District }) {
   }, [canvas, size]);
 
   const last = useRef({ m: new Matrix4(), p: new Matrix4(), w: 0, night: -1 });
+  // 品牌徽标图片：加载好后让标注层重画一次
+  const logos = useMemo(() => {
+    const map = new Map<string, HTMLImageElement>();
+    for (const b of BRAND_CATEGORIES) {
+      const img = new Image();
+      img.onload = () => {
+        last.current.w = -1;
+      };
+      img.src = `${import.meta.env.BASE_URL}brands/${b}.svg`;
+      map.set(b, img);
+    }
+    return map;
+  }, []);
   const widths = useRef(new Map<string, number>());
   const v = useMemo(() => new Vector3(), []);
 
@@ -316,6 +347,21 @@ export function Labels({ district }: { district: District }) {
         draw: () => {
           const s = project(p.x, p.y, p.z);
           if (!s) return;
+          if (p.style === 'brand') {
+            const img = p.logo ? logos.get(p.logo) : undefined;
+            if (!img?.complete || !img.naturalWidth) return;
+            const r = 11;
+            const box = { x0: s[0] - r, y0: s[1] - r, x1: s[0] + r, y1: s[1] + r };
+            if (!free(box)) return;
+            placed.push(box);
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+            ctx.shadowBlur = 3;
+            ctx.shadowOffsetY = 1;
+            ctx.drawImage(img, box.x0, box.y0, 2 * r, 2 * r);
+            ctx.restore();
+            return;
+          }
           const size = p.style === 'campus' ? 13 : p.style === 'station' ? 12 : 11;
           const weight = p.style === 'campus' || p.style === 'station' ? 600 : 500;
           const font = `${weight} ${size}px ${FONT}`;

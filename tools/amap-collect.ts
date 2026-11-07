@@ -8,6 +8,7 @@
  *   await jgCollect.regeo()   逆地理编码：每栋楼所在的 AOI（小区/校园）与附近 POI
  *   await jgCollect.roads()   逆地理编码：OSM 里没有名字的道路，沿线样点附近的道路名
  *   await jgCollect.pois()    按类别搜索片区内的设施 POI
+ *   await jgCollect.brands()  麦当劳、星巴克、海底捞（片区外扩约 3 km）
  */
 
 import { wgs84ToGcj02 } from './gcj02';
@@ -244,6 +245,41 @@ async function pois(grid = 3, only?: string[]): Promise<Record<string, number>> 
   return summary;
 }
 
+/** 几个指名的连锁品牌：片区外扩约 3 km 内按关键词搜，供"最近一家多远"与地图标注 */
+export const BRANDS = ['麦当劳', '星巴克', '海底捞'] as const;
+
+async function brands(): Promise<number> {
+  const WIDE = { south: 30.578, west: 104.075, north: 30.655, east: 104.165 };
+  const found = new Map<string, unknown>();
+  for (const brand of BRANDS) {
+    const bounds = new window.AMap.Bounds(
+      wgs84ToGcj02(WIDE.west, WIDE.south),
+      wgs84ToGcj02(WIDE.east, WIDE.north),
+    );
+    for (let page = 1; page <= 10; page++) {
+      const ps = new window.AMap.PlaceSearch({ pageSize: 50, pageIndex: page, extensions: 'base' });
+      const r = await searchPage(ps, brand, bounds);
+      const list = r.poiList?.pois ?? [];
+      for (const p of list) {
+        found.set(p.id, {
+          id: p.id,
+          brand,
+          name: p.name,
+          type: p.type,
+          address: typeof p.address === 'string' ? p.address : '',
+          location: `${p.location.lng},${p.location.lat}`,
+        });
+      }
+      log(`${brand} 第 ${page} 页：${list.length} 条，累计 ${found.size}`);
+      await sleep(380);
+      if (list.length < 50) break;
+    }
+  }
+  await save('poi-brands', [...found.values()]);
+  log(`品牌完成：${found.size} 条`);
+  return found.size;
+}
+
 /** 川师狮子山校区范围内按关键词补采校内建筑名（宿舍、教学楼、食堂等） */
 async function campusNames(): Promise<number> {
   const CAMPUS = { south: 30.6105, west: 104.1125, north: 30.6215, east: 104.1265 };
@@ -287,7 +323,7 @@ async function campusNames(): Promise<number> {
   return found.size;
 }
 
-const api = { regeo, roads, pois, campusNames };
+const api = { regeo, roads, pois, brands, campusNames };
 
 loadAMap()
   .then(() => {

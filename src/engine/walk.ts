@@ -297,6 +297,9 @@ export const CATEGORY_ORDER: PoiCategory[] = [
   'park',
   'sport',
   'school',
+  'mcdonalds',
+  'starbucks',
+  'haidilao',
 ];
 
 /** 从楼的出入口出发到各类设施的步行可达情况；maxMeters 之外不再搜索 */

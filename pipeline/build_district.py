@@ -652,6 +652,12 @@ def main() -> None:
         x, y = xy_local(p.lon, p.lat)
         if outer_local.contains(Point(float(x), float(y))):
             pois.append({"n": p.name, "c": p.category, "p": [dm(float(x)), dm(float(y))]})
+    # 指名的连锁品牌：片区外扩 3 km 内都收（最近一家可能在片区外）
+    wide = outer_local.buffer(3000)
+    for p in amap.load_brands(AMAP_RAW):
+        x, y = xy_local(p.lon, p.lat)
+        if wide.contains(Point(float(x), float(y))):
+            pois.append({"n": p.name, "c": p.category, "p": [dm(float(x)), dm(float(y))]})
     has_amap_metro = any(p["c"] == "metro" for p in pois)
     if not has_amap_metro:
         for el in metro_nodes:

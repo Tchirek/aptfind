@@ -39,6 +39,7 @@ function Main() {
         lines={[
           ...data.district.attribution,
           '星表：HYG Database v4.1（astronexus，CC BY-SA 4.0）',
+          '品牌标志：麦当劳、星巴克、海底捞的商标归各自所有者，仅用于标示门店位置；图形取自 Simple Icons 与维基百科',
         ]}
       />
     </>

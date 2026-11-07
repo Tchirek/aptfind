@@ -78,7 +78,13 @@ export type PoiCategory =
   | 'medical'
   | 'school'
   | 'park'
-  | 'sport';
+  | 'sport'
+  /** 指名标出的连锁品牌 */
+  | 'mcdonalds'
+  | 'starbucks'
+  | 'haidilao';
+
+export const BRAND_CATEGORIES = ['mcdonalds', 'starbucks', 'haidilao'] as const;
 
 export interface Poi {
   name: string;

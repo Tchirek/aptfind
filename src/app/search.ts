@@ -34,6 +34,9 @@ export const POI_LABEL: Record<PoiCategory, string> = {
   school: '学校',
   park: '公园',
   sport: '运动',
+  mcdonalds: '麦当劳',
+  starbucks: '星巴克',
+  haidilao: '海底捞',
 };
 
 const KIND_WEIGHT: Record<SearchKind, number> = {

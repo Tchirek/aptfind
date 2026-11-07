@@ -14,6 +14,8 @@ import {
 interface Row {
   category: PoiCategory;
   label: string;
+  /** 品牌徽标（public/brands/ 下） */
+  logo?: string;
   /** 只报 10 分钟内的数量，不报最近一处 */
   countOnly?: boolean;
 }
@@ -26,7 +28,13 @@ const ROWS: Row[] = [
   { category: 'food', label: '餐饮', countOnly: true },
   { category: 'medical', label: '医疗' },
   { category: 'park', label: '公园' },
+  { category: 'mcdonalds', label: '麦当劳', logo: 'mcdonalds' },
+  { category: 'starbucks', label: '星巴克', logo: 'starbucks' },
+  { category: 'haidilao', label: '海底捞', logo: 'haidilao' },
 ];
+
+/** '麦当劳(华固一品店)' → '华固一品店'：品牌行已有徽标，只留分店名 */
+const branchName = (name: string) => name.match(/[（(]([^）)]+)[）)]\s*$/)?.[1] ?? name;
 
 /** '狮子山地铁站B口' → '狮子山站 B口'，'四川师大(地铁站)' → '四川师大站' */
 export function shortPoiName(name: string): string {
@@ -51,7 +59,7 @@ export function AccessSection({ ring }: { ring: Float64Array }) {
     setState(null);
     getRegion().then(({ graph, pois }) => {
       if (!alive) return;
-      setState({ access: accessFrom(graph, pois, buildingDoors(graph, ring), 2000), graph });
+      setState({ access: accessFrom(graph, pois, buildingDoors(graph, ring), 3000), graph });
     });
     return () => {
       alive = false;
@@ -81,15 +89,26 @@ export function AccessSection({ ring }: { ring: Float64Array }) {
           return (
             <li key={row.category} className={row.category === active ? 'on' : ''}>
               <button type="button" onClick={() => setActive(row.category)} disabled={!reachable}>
-                <span className="access-kind">{row.label}</span>
+                <span className="access-kind">
+                  {row.logo && (
+                    <img
+                      className="brand-logo"
+                      src={`${import.meta.env.BASE_URL}brands/${row.logo}.svg`}
+                      alt=""
+                    />
+                  )}
+                  {row.label}
+                </span>
                 <span className="access-name">
                   {!state
                     ? '…'
                     : !reachable
-                      ? '2 公里内没有'
+                      ? '3 公里内没有'
                       : row.countOnly
                         ? `10 分钟内 ${c.within10} 家`
-                        : shortPoiName(c.nearest?.poi.name ?? '')}
+                        : row.logo
+                          ? branchName(c.nearest?.poi.name ?? '')
+                          : shortPoiName(c.nearest?.poi.name ?? '')}
                 </span>
                 <span className="access-time mono">
                   {reachable && !row.countOnly ? fmtMinutes(c.meters) : ''}
