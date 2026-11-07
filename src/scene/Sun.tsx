@@ -1,33 +1,25 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { type DirectionalLight, Vector3 } from 'three';
-import { presetDate, useApp } from '../app/store';
-import { sunDirectionEnu, sunPosition, trueSolarTimeToUtc } from '../engine/solar';
+import { useApp } from '../app/store';
+import { sunAt } from '../app/time';
+import { sunDirectionEnu } from '../engine/solar';
 import { enuToWorld } from './coords';
 
-const ORIGIN = { lat: 30.616, lon: 104.12 };
-
-/** 日照时数模式用的固定光：东南方 45° 仰角，只为把体块交代清楚 */
-const STUDIO_DIR = new Vector3(...enuToWorld(...sunDirectionEnu(150, 45))).normalize();
-
 export function Sun() {
-  const mode = useApp((s) => s.mode);
-  const day = useApp((s) => s.day);
-  const tst = useApp((s) => s.tst);
+  const date = useApp((s) => s.date);
+  const minute = useApp((s) => s.minute);
   const light = useRef<DirectionalLight>(null);
   const { controls, camera, scene } = useThree();
 
   const sun = useMemo(() => {
-    const utc = trueSolarTimeToUtc(presetDate(day), tst, ORIGIN.lon);
-    const p = sunPosition(utc, ORIGIN.lat, ORIGIN.lon);
+    const p = sunAt(date, minute);
     const dir = new Vector3(...enuToWorld(...sunDirectionEnu(p.azimuth, p.apparentElevation)));
     return { dir: dir.normalize(), elevation: p.apparentElevation };
-  }, [day, tst]);
+  }, [date, minute]);
 
-  const shadowMode = mode === 'shadow';
-  const dir = shadowMode ? sun.dir : STUDIO_DIR;
   // 太阳贴近地平线时逐渐变暗，落山后只剩天光
-  const intensity = shadowMode ? 3.6 * Math.min(1, Math.max(0, sun.elevation) / 6) : 2.2;
+  const intensity = 3.6 * Math.min(1, Math.max(0, sun.elevation) / 6);
 
   useEffect(() => {
     const l = light.current;
@@ -55,18 +47,18 @@ export function Sun() {
       cam.bottom = -extent;
       cam.updateProjectionMatrix();
     }
-    l.position.copy(target.current).addScaledVector(dir, 3000);
+    l.position.copy(target.current).addScaledVector(sun.dir, 3000);
     l.target.position.copy(target.current);
   });
 
   return (
     <>
-      <hemisphereLight args={['#ffffff', '#d9d3c7', shadowMode ? 0.8 : 1.5]} />
+      <hemisphereLight args={['#ffffff', '#d9d3c7', 0.8]} />
       <directionalLight
         ref={light}
         intensity={intensity}
-        color={shadowMode && sun.elevation < 12 ? '#ffe2c4' : '#ffffff'}
-        castShadow={shadowMode}
+        color={sun.elevation < 12 ? '#ffe2c4' : '#ffffff'}
+        castShadow
         shadow-mapSize={[4096, 4096]}
         shadow-camera-near={10}
         shadow-camera-far={6000}

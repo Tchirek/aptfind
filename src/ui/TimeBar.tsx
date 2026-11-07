@@ -1,89 +1,91 @@
 import { useEffect } from 'react';
 import { formatClock } from '../app/format';
-import { type DayPreset, presetDate, useApp } from '../app/store';
-import { trueSolarTimeToUtc, utcToBeijingMinutes } from '../engine/solar';
+import { useApp } from '../app/store';
+import { dateToIso, isoToDate, TERM_PICKS, upcomingTerm } from '../app/time';
 
-const DAYS: DayPreset[] = ['大寒', '冬至', '春分', '夏至'];
-const LON = 104.12;
-/** 光影模式的时间轴范围：真太阳时 6:30–17:30，覆盖冬季日出到日落 */
-const MIN_TST = 6.5 * 60;
-const MAX_TST = 17.5 * 60;
-/** 播放时 1 秒走过的真太阳时分钟数 */
-const PLAY_SPEED = 90;
+/** 播放时 1 秒走过的分钟数 */
+const PLAY_SPEED = 60;
 
 export function TimeBar() {
-  const mode = useApp((s) => s.mode);
-  const day = useApp((s) => s.day);
-  const tst = useApp((s) => s.tst);
+  const date = useApp((s) => s.date);
+  const minute = useApp((s) => s.minute);
+  const live = useApp((s) => s.live);
   const playing = useApp((s) => s.playing);
-  const { setDay, setTst, setPlaying } = useApp.getState();
+  const { setDate, setMinute, setPlaying, goLive, syncNow } = useApp.getState();
+
+  // 跟随现在：半分钟同步一次
+  useEffect(() => {
+    const id = setInterval(syncNow, 30_000);
+    return () => clearInterval(id);
+  }, [syncNow]);
 
   useEffect(() => {
     if (!playing) return;
     let last = performance.now();
     let raf = 0;
     const tick = (now: number) => {
-      const t = useApp.getState().tst + ((now - last) / 1000) * PLAY_SPEED;
+      const m = useApp.getState().minute + ((now - last) / 1000) * PLAY_SPEED;
       last = now;
-      setTst(t > MAX_TST ? MIN_TST : t);
+      useApp.setState({ minute: m % 1440 });
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, setTst]);
+  }, [playing]);
 
-  const date = presetDate(day);
-  const bj = utcToBeijingMinutes(trueSolarTimeToUtc(date, tst, LON));
+  const today = useApp.getState().live ? date : undefined;
 
   return (
     <div className="panel timebar">
-      <fieldset className="days" aria-label="日期">
-        {DAYS.map((d) => {
-          const dd = presetDate(d);
+      <div className="days">
+        <input
+          type="date"
+          value={dateToIso(date)}
+          onChange={(e) => {
+            const d = isoToDate(e.target.value);
+            if (d) setDate(d);
+          }}
+          aria-label="日期"
+        />
+        {TERM_PICKS.map((term) => {
+          const d = upcomingTerm(term, today ?? date);
           return (
-            <button
-              type="button"
-              key={d}
-              aria-pressed={d === day}
-              className={d === day ? 'chip on' : 'chip'}
-              onClick={() => setDay(d)}
-            >
-              {d}
-              <small>
-                {dd.month}/{dd.day}
-              </small>
+            <button type="button" key={term} className="chip" onClick={() => setDate(d)}>
+              {term}
             </button>
           );
         })}
-      </fieldset>
-      {mode === 'shadow' ? (
-        <div className="clock">
-          <button
-            type="button"
-            className="play"
-            onClick={() => setPlaying(!playing)}
-            aria-label={playing ? '暂停' : '播放'}
-          >
-            {playing ? '❚❚' : '▶'}
-          </button>
-          <input
-            type="range"
-            min={MIN_TST}
-            max={MAX_TST}
-            step={1}
-            value={tst}
-            onChange={(e) => {
-              setPlaying(false);
-              setTst(Number(e.target.value));
-            }}
-            aria-label="时刻"
-          />
-          <div className="readout">
-            <span className="mono">{formatClock(bj)}</span>
-            <small>北京时间 · 真太阳时 {formatClock(tst)}</small>
-          </div>
+      </div>
+      <div className="clock">
+        <button
+          type="button"
+          className="play"
+          onClick={() => setPlaying(!playing)}
+          aria-label={playing ? '暂停' : '播放'}
+        >
+          {playing ? '❚❚' : '▶'}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={1439}
+          step={1}
+          value={minute}
+          onChange={(e) => {
+            setPlaying(false);
+            setMinute(Number(e.target.value));
+          }}
+          aria-label="时刻"
+        />
+        <div className="readout">
+          <span className="mono">{formatClock(minute)}</span>
+          {!live && (
+            <button type="button" className="chip" onClick={goLive}>
+              现在
+            </button>
+          )}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

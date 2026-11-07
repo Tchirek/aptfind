@@ -62,27 +62,6 @@ button {
   border-radius: var(--radius);
 }
 
-/* 模式切换 */
-.mode-switch {
-  top: 20px;
-  right: 24px;
-  display: flex;
-  padding: 3px;
-  gap: 2px;
-}
-.mode-switch button {
-  border: 0;
-  background: none;
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: var(--ink-2);
-}
-.mode-switch button.on {
-  background: var(--ink);
-  color: #fff;
-}
-
 /* 时间条 */
 .timebar {
   left: 50%;
@@ -152,19 +131,7 @@ button {
   color: var(--ink-3);
 }
 
-/* 图例 */
-.legend {
-  left: 24px;
-  top: 76px;
-  padding: 10px 14px 8px;
-  margin: 0;
-  width: 248px;
-}
-.legend figcaption {
-  font-size: 12px;
-  color: var(--ink-2);
-  margin-bottom: 8px;
-}
+/* 色带（详情面板里用） */
 .ramp {
   position: relative;
   display: flex;
@@ -511,13 +478,6 @@ button {
 }
 
 @media (max-width: 720px) {
-  .mode-switch {
-    top: 12px;
-    right: 12px;
-  }
-  .legend {
-    display: none;
-  }
   .attribution-wrap {
     right: 12px;
     bottom: 10px;

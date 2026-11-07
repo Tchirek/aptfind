@@ -1,36 +1,9 @@
 import { Component, type ReactNode, Suspense, use, useState } from 'react';
 import { sceneData } from './app/data';
-import { useApp } from './app/store';
 import { Scene } from './scene/Scene';
 import { Inspector } from './ui/Inspector';
-import { Legend } from './ui/Legend';
 import { SearchBox } from './ui/SearchBox';
 import { TimeBar } from './ui/TimeBar';
-
-function ModeSwitch() {
-  const mode = useApp((s) => s.mode);
-  const setMode = useApp((s) => s.setMode);
-  return (
-    <fieldset className="panel mode-switch" aria-label="显示">
-      <button
-        type="button"
-        aria-pressed={mode === 'hours'}
-        className={mode === 'hours' ? 'on' : ''}
-        onClick={() => setMode('hours')}
-      >
-        日照时数
-      </button>
-      <button
-        type="button"
-        aria-pressed={mode === 'shadow'}
-        className={mode === 'shadow' ? 'on' : ''}
-        onClick={() => setMode('shadow')}
-      >
-        光影
-      </button>
-    </fieldset>
-  );
-}
 
 function Attribution({ lines }: { lines: string[] }) {
   const [open, setOpen] = useState(false);
@@ -52,14 +25,11 @@ function Attribution({ lines }: { lines: string[] }) {
 
 function Main() {
   const data = use(sceneData);
-  const mode = useApp((s) => s.mode);
   return (
     <>
       <Scene data={data} />
       <SearchBox data={data} />
-      <ModeSwitch />
       <TimeBar />
-      {mode === 'hours' && <Legend />}
       <Inspector data={data} />
       <Attribution lines={data.district.attribution} />
     </>

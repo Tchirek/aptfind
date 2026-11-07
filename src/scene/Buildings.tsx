@@ -26,7 +26,6 @@ export function centroid(ring: Float64Array): [number, number] {
 export const isDrag = (e: ThreeEvent<MouseEvent>) => e.delta > 4;
 
 export function Buildings({ data }: { data: SceneData }) {
-  const mode = useApp((s) => s.mode);
   const selection = useApp((s) => s.selection);
   const focus = useApp((s) => s.focusBuilding);
   const select = useApp((s) => s.select);
@@ -57,8 +56,6 @@ export function Buildings({ data }: { data: SceneData }) {
     return b ? buildSolids([b]).geometry : null;
   }, [buildings, focus]);
 
-  const shadows = mode === 'shadow';
-
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (isDrag(e) || !e.face) return;
     e.stopPropagation();
@@ -75,10 +72,10 @@ export function Buildings({ data }: { data: SceneData }) {
 
   return (
     <group>
-      <mesh geometry={core.geometry} castShadow={shadows} receiveShadow onClick={onClick}>
+      <mesh geometry={core.geometry} castShadow receiveShadow onClick={onClick}>
         <meshStandardMaterial color={CORE_COLOR} roughness={0.92} />
       </mesh>
-      <mesh geometry={buffer} castShadow={shadows} receiveShadow>
+      <mesh geometry={buffer} castShadow receiveShadow>
         <meshStandardMaterial color={BUFFER_COLOR} roughness={0.95} />
       </mesh>
       {focusGeometry && (

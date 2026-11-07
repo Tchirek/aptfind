@@ -1,21 +1,6 @@
 import { create } from 'zustand';
-import {
-  type CivilDate,
-  type SolarTermName,
-  solarTermUtc,
-  utcToBeijingDate,
-} from '../engine/solar';
-
-export type ViewMode = 'hours' | 'shadow';
-
-export type DayPreset = '大寒' | '冬至' | '春分' | '夏至';
-
-/** 节气取离现在最近的一次（2026 年 11 月起算：冬至 2026，其余 2027） */
-const PRESET_YEAR: Record<DayPreset, number> = { 冬至: 2026, 大寒: 2027, 春分: 2027, 夏至: 2027 };
-
-export function presetDate(p: DayPreset): CivilDate {
-  return utcToBeijingDate(solarTermUtc(PRESET_YEAR[p], p as SolarTermName));
-}
+import type { CivilDate } from '../engine/solar';
+import { nowBeijing } from './time';
 
 export type Selection =
   | { kind: 'window'; index: number }
@@ -44,10 +29,12 @@ export interface FlyTo {
 }
 
 interface AppState {
-  mode: ViewMode;
-  day: DayPreset;
-  /** 光影模式下的时刻：真太阳时，当日第几分钟 */
-  tst: number;
+  /** 场景日期（北京时间） */
+  date: CivilDate;
+  /** 北京时间，当日第几分钟，可带小数 */
+  minute: number;
+  /** 跟随现在：每过一会儿同步到当前时刻；拖动时间轴、换日期或播放时退出 */
+  live: boolean;
   playing: boolean;
   selection: Selection;
   /** 在时间轴上悬停/点选的挡光建筑，用于在场景里高亮 */
@@ -55,9 +42,12 @@ interface AppState {
   flyTo: FlyTo | null;
   marker: Marker | null;
   route: Route | null;
-  setMode: (mode: ViewMode) => void;
-  setDay: (day: DayPreset) => void;
-  setTst: (tst: number) => void;
+  setDate: (date: CivilDate) => void;
+  setMinute: (minute: number) => void;
+  /** 回到现在，并开始跟随 */
+  goLive: () => void;
+  /** 跟随现在时由定时器调用 */
+  syncNow: () => void;
   setPlaying: (playing: boolean) => void;
   select: (s: Selection) => void;
   setFocusBuilding: (b: number | null) => void;
@@ -66,20 +56,22 @@ interface AppState {
   setRoute: (r: Route | null) => void;
 }
 
-export const useApp = create<AppState>((set) => ({
-  mode: 'hours',
-  day: '大寒',
-  tst: 10 * 60,
+export const useApp = create<AppState>((set, get) => ({
+  ...nowBeijing(),
+  live: true,
   playing: false,
   selection: null,
   focusBuilding: null,
   flyTo: null,
   marker: null,
   route: null,
-  setMode: (mode) => set({ mode }),
-  setDay: (day) => set({ day }),
-  setTst: (tst) => set({ tst }),
-  setPlaying: (playing) => set({ playing }),
+  setDate: (date) => set({ date, live: false }),
+  setMinute: (minute) => set({ minute: ((minute % 1440) + 1440) % 1440, live: false }),
+  goLive: () => set({ ...nowBeijing(), live: true, playing: false }),
+  syncNow: () => {
+    if (get().live) set(nowBeijing());
+  },
+  setPlaying: (playing) => set(playing ? { playing, live: false } : { playing }),
   select: (selection) => set({ selection, focusBuilding: null, route: null }),
   setFocusBuilding: (focusBuilding) => set({ focusBuilding }),
   requestFly: (target, distance) => set({ flyTo: { target, distance, nonce: Math.random() } }),

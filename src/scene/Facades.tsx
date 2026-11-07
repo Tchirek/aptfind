@@ -49,7 +49,6 @@ function frameGeometry(grid: WindowGrid, i: number): BufferGeometry {
 }
 
 export function Facades({ data }: { data: SceneData }) {
-  const mode = useApp((s) => s.mode);
   const selection = useApp((s) => s.selection);
   const select = useApp((s) => s.select);
 
@@ -78,12 +77,7 @@ export function Facades({ data }: { data: SceneData }) {
 
   return (
     <group>
-      <mesh
-        geometry={geometry}
-        material={material}
-        visible={mode === 'hours'}
-        onClick={mode === 'hours' ? onClick : undefined}
-      />
+      <mesh geometry={geometry} material={material} onClick={onClick} />
       {frame && (
         <mesh geometry={frame} renderOrder={7}>
           <meshBasicMaterial color="#1f1f1c" side={DoubleSide} toneMapped={false} />

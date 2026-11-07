@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { getEngine, type SceneData } from '../app/data';
 import { formatClock, formatDuration, windowOrientation } from '../app/format';
 import { buildingTitle } from '../app/search';
-import { presetDate, useApp } from '../app/store';
+import { useApp } from '../app/store';
+import { daylightSpec, formatDate } from '../app/time';
 import { type Building, CLASS_LABEL, type District } from '../engine/district';
 import { floorsOf } from '../engine/geometry';
-import { RULE_DAHAN } from '../engine/standard';
 import { AWAY, LIT, type Span, SunPath, TERRAIN } from '../engine/sunlight';
 import { AccessSection } from './AccessSection';
 import { THRESHOLD_MINUTES } from './palette';
@@ -50,12 +50,13 @@ function shortfall(data: SceneData, buildings: Iterable<number>): { below: numbe
   return { below, count };
 }
 
+/** 大寒日（真太阳时 8–16 时）的日照，对照 GB 50180 的 2 小时 */
 function Verdict({ minutes }: { minutes: number }) {
   const ok = minutes >= THRESHOLD_MINUTES;
   return (
     <span className={`verdict ${ok ? 'good' : 'bad'}`}>
       <span aria-hidden>{ok ? '✓' : '!'}</span>
-      {ok ? '满足大寒日 2 小时' : '不足大寒日 2 小时'}
+      大寒日 {formatDuration(minutes)} · {ok ? '满足' : '不足'} 2 小时
     </span>
   );
 }
@@ -71,7 +72,7 @@ function Head({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: s
 }
 
 function WindowDetail({ data, index }: { data: SceneData; index: number }) {
-  const day = useApp((s) => s.day);
+  const date = useApp((s) => s.date);
   const setFocus = useApp((s) => s.setFocusBuilding);
   const d = data.district;
   const b = d.buildings[data.grid.building[index] as number] as Building;
@@ -86,13 +87,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
     let alive = true;
     setResult(null);
     getEngine().then((engine) => {
-      const path = new SunPath({
-        date: presetDate(day),
-        startTst: RULE_DAHAN.startTst,
-        endTst: RULE_DAHAN.endTst,
-        lat: d.origin.lat,
-        lon: d.origin.lon,
-      });
+      const path = new SunPath(daylightSpec(date));
       const spans: Span[] = [];
       const minutes = engine.trace(
         data.grid,
@@ -106,7 +101,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
     return () => {
       alive = false;
     };
-  }, [data, d, index, day]);
+  }, [data, index, date]);
 
   const blockers = useMemo(
     () => (result ? result.spans.filter((s) => s.state !== LIT && s.state !== AWAY) : []),
@@ -125,11 +120,11 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
       />
 
       <section>
-        <div className="label">{day}日照</div>
+        <div className="label">{formatDate(date)} 日照</div>
         {result ? (
           <>
             <div className="big-number">{formatDuration(result.minutes)}</div>
-            {day === '大寒' && <Verdict minutes={result.minutes} />}
+            <Verdict minutes={data.dahanMinutes[index] as number} />
             <Timeline spans={result.spans} path={result.path} onFocus={setFocus} />
           </>
         ) : (
