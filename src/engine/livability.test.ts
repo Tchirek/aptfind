@@ -94,7 +94,7 @@ describe('scoreLivability', () => {
     const b = (f: number) =>
       scoreLivability({ ...good, floors: f }).dimensions.find((d) => d.key === 'building');
     expect((b(18)?.score ?? 0) - (b(6)?.score ?? 0)).toBeCloseTo(4, 5);
-    expect(b(6)?.detail).toContain('无电梯');
+    expect(b(6)?.facts).toContainEqual({ label: '电梯', value: '无' });
   });
 
   it('楼间距与周边覆盖率拉开环境分', () => {

@@ -1,42 +1,22 @@
 import { useApp } from '../app/store';
-import { ROOF_COLORS, roofColorOf } from '../scene/buildingGeometry';
+import type { Fact } from '../engine/livability';
 
-/** 屋顶色的图例：五档色带，标出这栋楼落在哪 */
-function RoofKey({ score, stops }: { score: number; stops: readonly number[] }) {
-  const lo = stops[0] as number;
-  const hi = stops[stops.length - 1] as number;
-  const pos = Math.min(1, Math.max(0, (score - lo) / Math.max(1, hi - lo)));
-  // 色带上各档按分数等距排开，与屋顶的插值一致
-  const grad = ROOF_COLORS.map(
-    (c, i) => `${c} ${(((stops[i] as number) - lo) / Math.max(1, hi - lo)) * 100}%`,
-  ).join(', ');
+/** 依据排成四列小格：上面是短标签，下面是数值，各维度之间上下对齐 */
+function Facts({ facts }: { facts: Fact[] }) {
   return (
-    <div className="liv-key">
-      <span className="liv-key-label">屋顶色</span>
-      <span className="liv-key-bar" style={{ background: `linear-gradient(90deg, ${grad})` }}>
-        <i
-          style={{
-            left: `${pos * 100}%`,
-            background: `#${roofColorOf(score, stops).getHexString()}`,
-          }}
-        />
-      </span>
-      <span className="liv-key-ends mono">
-        {lo}–{hi}
-      </span>
-    </div>
+    <dl className="liv-facts">
+      {facts.map((f) => (
+        <div key={f.label}>
+          <dt>{f.label}</dt>
+          <dd className="mono">{f.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
-/** 选中楼的宜居评分：总分、逐项贡献（带依据）与扣分项；有屋顶色阶时附上图例 */
-export function LivabilitySection({
-  building,
-  roofStops,
-}: {
-  building: number;
-  /** 这栋楼的屋顶按评分着色时传入色阶节点 */
-  roofStops?: readonly number[];
-}) {
+/** 选中楼的宜居评分：总分、逐项贡献（带依据）与扣分项 */
+export function LivabilitySection({ building }: { building: number }) {
   const livability = useApp((s) => s.livability);
   const mine = livability?.building === building ? livability : null;
 
@@ -57,7 +37,6 @@ export function LivabilitySection({
         <span className={`liv-grade ${mine.tone}`}>{mine.label}</span>
         <span className="liv-sum">{mine.summary}</span>
       </div>
-      {roofStops && <RoofKey score={mine.total} stops={roofStops} />}
       <ul className="liv-dims">
         {mine.dimensions.map((d) => (
           <li key={d.key}>
@@ -69,7 +48,7 @@ export function LivabilitySection({
               {Math.round(d.score)}
               <small>/{d.max}</small>
             </span>
-            <span className="liv-detail">{d.detail}</span>
+            <Facts facts={d.facts} />
           </li>
         ))}
       </ul>
@@ -77,9 +56,10 @@ export function LivabilitySection({
         <ul className="liv-pen">
           {mine.penalties.map((p) => (
             <li key={p.label}>
-              <span>{p.label}</span>
-              <span className="mono">−{Math.round(p.points * 10) / 10}</span>
-              <span className="liv-detail">{p.detail}</span>
+              <span className="liv-name">{p.label}</span>
+              <span />
+              <span className="liv-pts mono">−{Math.round(p.points * 10) / 10}</span>
+              <Facts facts={p.facts} />
             </li>
           ))}
         </ul>

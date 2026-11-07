@@ -37,12 +37,19 @@ function farBy(value: number, low: number, high: number): number {
 
 export type Tone = 'good' | 'fair' | 'poor';
 
+/** 一条量化依据：短标签 + 数值，界面上排成整齐的小格 */
+export interface Fact {
+  label: string;
+  value: string;
+}
+
 export interface Dimension {
   key: 'light' | 'transit' | 'amenity' | 'education' | 'environment' | 'building';
   label: string;
   score: number;
   max: number;
-  /** 量化依据，如"朝南窗位 62% 达标 · 中位 3 小时 12 分" */
+  facts: Fact[];
+  /** 依据连成一句，如"朝南达标 62% · 中位 3.2 小时"（摘要、测试用） */
   detail: string;
 }
 
@@ -50,7 +57,20 @@ export interface Penalty {
   label: string;
   /** 扣掉的分数（正数） */
   points: number;
+  facts: Fact[];
   detail: string;
+}
+
+const joinFacts = (facts: Fact[]) => facts.map((f) => `${f.label} ${f.value}`).join(' · ');
+
+function dimension(
+  key: Dimension['key'],
+  label: string,
+  score: number,
+  max: number,
+  facts: Fact[],
+): Dimension {
+  return { key, label, score, max, facts, detail: joinFacts(facts) };
 }
 
 export interface LivabilityFacts {
@@ -150,16 +170,14 @@ export function mainFacadeWindows(
   return south.length > 0 ? { values: south, south: true } : { values: all, south: false };
 }
 
+/** 时长写短：一小时内"37 分钟"，以上"3.2 小时" */
 function hours(minutes: number): string {
   const m = Math.round(minutes);
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  if (h === 0) return `${r} 分钟`;
-  return r === 0 ? `${h} 小时` : `${h} 小时 ${r} 分`;
+  if (m < 60) return `${m} 分钟`;
+  return `${(m / 60).toFixed(1).replace(/\.0$/, '')} 小时`;
 }
 
-const walk = (m: number) =>
-  Number.isFinite(m) ? `${Math.max(1, Math.round(m))} 分钟` : '3 km 内没有';
+const walk = (m: number) => (Number.isFinite(m) ? `${Math.max(1, Math.round(m))} 分钟` : '3 km 外');
 
 /**
  * 采光：朝南窗位的达标比例、中位时长，再加上最差两成窗位的时长——
@@ -175,13 +193,11 @@ function lightDimension(facts: LivabilityFacts): Dimension | null {
   const med = quantile(sorted, 0.5);
   const low = quantile(sorted, 0.2);
   const score = MAX.light * (0.3 * share + 0.35 * farBy(med, 60, 360) + 0.35 * farBy(low, 0, 240));
-  return {
-    key: 'light',
-    label: '采光',
-    score,
-    max: MAX.light,
-    detail: `${south ? '朝南' : ''}窗位 ${Math.round(share * 100)}% 达标 · 中位 ${hours(med)} · 较差两成 ${hours(low)}`,
-  };
+  return dimension('light', '采光', score, MAX.light, [
+    { label: south ? '朝南达标' : '达标', value: `${Math.round(share * 100)}%` },
+    { label: '中位', value: hours(med) },
+    { label: '较差两成', value: hours(low) },
+  ]);
 }
 
 /** 交通：走到地铁口、30 分钟内坐地铁能到多少站、公交 */
@@ -189,13 +205,11 @@ function transitDimension(facts: LivabilityFacts): Dimension {
   const metro = 8 * nearBy(facts.metroMinutes, 3, 18);
   const reach = 6 * farBy(facts.reachStations, 8, 34);
   const bus = 4 * nearBy(facts.busMinutes, 1, 8);
-  return {
-    key: 'transit',
-    label: '交通',
-    score: metro + reach + bus,
-    max: MAX.transit,
-    detail: `步行到地铁 ${walk(facts.metroMinutes)} · 30 分钟可达 ${facts.reachStations} 站 · 公交 ${walk(facts.busMinutes)}`,
-  };
+  return dimension('transit', '交通', metro + reach + bus, MAX.transit, [
+    { label: '地铁', value: walk(facts.metroMinutes) },
+    { label: '30 分钟可达', value: `${facts.reachStations} 站` },
+    { label: '公交', value: walk(facts.busMinutes) },
+  ]);
 }
 
 /** 生活配套：超市、菜市场、医院要近，餐饮与运动场所要多 */
@@ -206,15 +220,12 @@ function amenityDimension(facts: LivabilityFacts): Dimension {
   const hospital = 3 * nearBy(facts.hospitalMinutes, 5, 25);
   const food = 3 * farBy(w.food, 20, 220);
   const sport = 2 * farBy(w.sport, 1, 15);
-  return {
-    key: 'amenity',
-    label: '生活配套',
-    score: grocery + market + hospital + food + sport,
-    max: MAX.amenity,
-    detail: `超市 ${walk(facts.groceryMinutes)} · 菜市场 ${walk(facts.marketMinutes)} · 医院 ${walk(
-      facts.hospitalMinutes,
-    )} · 10 分钟内餐饮 ${w.food} 家`,
-  };
+  return dimension('amenity', '生活配套', grocery + market + hospital + food + sport, MAX.amenity, [
+    { label: '超市', value: walk(facts.groceryMinutes) },
+    { label: '菜市场', value: walk(facts.marketMinutes) },
+    { label: '医院', value: walk(facts.hospitalMinutes) },
+    { label: '附近餐饮', value: `${w.food} 家` },
+  ]);
 }
 
 /** 教育：步行到幼儿园、小学、中学 */
@@ -222,15 +233,11 @@ function educationDimension(facts: LivabilityFacts): Dimension {
   const k = 3 * nearBy(facts.kindergartenMinutes, 3, 15);
   const p = 4 * nearBy(facts.primaryMinutes, 5, 20);
   const m = 3 * nearBy(facts.middleMinutes, 8, 30);
-  return {
-    key: 'education',
-    label: '教育',
-    score: k + p + m,
-    max: MAX.education,
-    detail: `幼儿园 ${walk(facts.kindergartenMinutes)} · 小学 ${walk(facts.primaryMinutes)} · 中学 ${walk(
-      facts.middleMinutes,
-    )}`,
-  };
+  return dimension('education', '教育', k + p + m, MAX.education, [
+    { label: '幼儿园', value: walk(facts.kindergartenMinutes) },
+    { label: '小学', value: walk(facts.primaryMinutes) },
+    { label: '中学', value: walk(facts.middleMinutes) },
+  ]);
 }
 
 /** 环境与视野：楼间距、开阔度、周边建筑密不密、离水面和公园多远 */
@@ -239,17 +246,18 @@ function environmentDimension(facts: LivabilityFacts): Dimension {
   const openness = 5 * clamp(facts.openness, 0, 1) ** 0.7;
   const coverage = 3 * nearBy(facts.coverage, 0.18, 0.42);
   const green = 4 * nearBy(facts.greenMeters, 150, 900);
-  return {
-    key: 'environment',
-    label: '环境与视野',
-    score: spacing + openness + coverage + green,
-    max: MAX.environment,
-    detail: `楼间距 ${Math.round(facts.spacing)} m · 开阔度 ${Math.round(
-      clamp(facts.openness, 0, 1) * 100,
-    )}% · 周边建筑覆盖 ${Math.round(facts.coverage * 100)}% · 距水面或公园 ${Math.round(
-      facts.greenMeters,
-    )} m`,
-  };
+  return dimension(
+    'environment',
+    '环境与视野',
+    spacing + openness + coverage + green,
+    MAX.environment,
+    [
+      { label: '楼间距', value: `${Math.round(facts.spacing)} m` },
+      { label: '开阔度', value: `${Math.round(clamp(facts.openness, 0, 1) * 100)}%` },
+      { label: '周边覆盖', value: `${Math.round(facts.coverage * 100)}%` },
+      { label: '水面公园', value: `${Math.round(facts.greenMeters)} m` },
+    ],
+  );
 }
 
 /**
@@ -265,29 +273,27 @@ function hasLift(floors: number, builtYear: number | null): boolean | null {
 
 function buildingDimension(facts: LivabilityFacts): Dimension {
   let age = 5;
-  let ageText = '建成年代未知';
-  if (facts.builtYear !== null) {
+  const out: Fact[] = [];
+  if (facts.builtYear === null) {
+    out.push({ label: '建成', value: '未知' });
+  } else {
     const years = CURRENT_YEAR - facts.builtYear;
     age = 10 * clamp(1 - (years - 3) / 37, 0.1, 1);
-    ageText =
-      years < 0 ? `预计 ${facts.builtYear} 年交付` : `${facts.builtYear} 年建成 · ${years} 年`;
+    if (years < 0) {
+      out.push({ label: '预计交付', value: `${facts.builtYear} 年` });
+    } else {
+      out.push({ label: '建成', value: `${facts.builtYear} 年` });
+      out.push({ label: '楼龄', value: `${years} 年` });
+    }
   }
   const has = hasLift(facts.floors, facts.builtYear);
   const lift = has ? 5 : facts.floors <= 3 ? 3.5 : has === null ? 3 : 1;
-  const liftText = has
-    ? '有电梯'
-    : facts.floors <= 3
-      ? '低层'
-      : has === null
-        ? `${facts.floors} 层`
-        : `${facts.floors} 层无电梯`;
-  return {
-    key: 'building',
-    label: '楼龄与电梯',
-    score: age + lift,
-    max: MAX.building,
-    detail: `${ageText} · ${liftText}`,
-  };
+  out.push({ label: '层数', value: `${facts.floors} 层` });
+  out.push({
+    label: '电梯',
+    value: has ? '有' : facts.floors <= 3 ? '低层不需' : has === null ? '—' : '无',
+  });
+  return dimension('building', '楼龄与电梯', age + lift, MAX.building, out);
 }
 
 /** 交通噪声：快速路影响最远、扣得最多，主干道次之，次干道只管贴边的楼；取最重的一条 */
@@ -304,7 +310,8 @@ function noisePenalty(facts: LivabilityFacts): Penalty | null {
     if (!(d < n.radius)) return;
     const points = n.cap * (1 - d / n.radius);
     if (!best || points > best.points) {
-      best = { label: '交通噪声', points, detail: `距${n.name} ${Math.round(d)} m` };
+      const facts = [{ label: `距${n.name}`, value: `${Math.round(d)} m` }];
+      best = { label: '交通噪声', points, facts, detail: joinFacts(facts) };
     }
   });
   return best;

@@ -8,7 +8,6 @@ import { daylightSpec, dayTimes, formatDate } from '../app/time';
 import { type Building, CLASS_LABEL, type District } from '../engine/district';
 import { floorsOf } from '../engine/geometry';
 import { AWAY, LIT, type Span, SunPath, TERRAIN } from '../engine/sunlight';
-import { DEFAULT_ROOF_STOPS } from '../scene/buildingGeometry';
 import { AccessSection } from './AccessSection';
 import { LandPriceSection } from './LandPriceSection';
 import { LivabilitySection } from './LivabilitySection';
@@ -301,12 +300,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
           </p>
         </section>
       )}
-      <LivabilitySection
-        building={index}
-        roofStops={
-          (data.roofScores[index] ?? -1) >= 0 ? (data.roofStops ?? DEFAULT_ROOF_STOPS) : undefined
-        }
-      />
+      <LivabilitySection building={index} />
       <LandPriceSection />
       <ReachSection building={index} />
       <AccessSection ring={b.rings[0] as Float64Array} />

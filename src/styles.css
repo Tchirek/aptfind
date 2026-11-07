@@ -437,7 +437,6 @@ button {
     padding-bottom: 8px;
   }
   .reach-text-btn,
-  .reach-toggle,
   .inspector-head .back {
     min-height: 32px;
     padding: 4px 6px;
@@ -581,31 +580,6 @@ button {
   gap: 8px;
   flex-wrap: wrap;
 }
-/* 屋顶色图例：五档色带，圆点标出这栋楼 */
-.liv-key {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--ink-3);
-}
-.liv-key-bar {
-  position: relative;
-  height: 6px;
-  border-radius: 3px;
-}
-.liv-key-bar i {
-  position: absolute;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px rgba(15, 30, 51, 0.25);
-  transform: translate(-50%, -50%);
-}
 .liv-score {
   font-size: 30px;
   font-weight: 650;
@@ -640,10 +614,10 @@ button {
 }
 .liv-dims {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   display: grid;
-  gap: 7px;
+  gap: 12px;
 }
 .liv-dims li {
   display: grid;
@@ -674,11 +648,31 @@ button {
   font-size: 10px;
   color: var(--ink-3);
 }
-.liv-detail {
+/* 依据：四列小格，上标签下数值，各维度上下对齐 */
+.liv-facts {
   grid-column: 1 / -1;
-  font-size: 11px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 8px;
+  margin: 2px 0 0;
+}
+.liv-facts div {
+  min-width: 0;
+}
+.liv-facts dt {
+  font-size: 10px;
+  line-height: 14px;
   color: var(--ink-3);
-  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.liv-facts dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+  white-space: nowrap;
 }
 .liv-pen {
   list-style: none;
@@ -686,17 +680,18 @@ button {
   padding: 8px 0 0;
   border-top: 1px solid #e6ecf3;
   display: grid;
-  gap: 4px;
-  font-size: 12px;
+  gap: 12px;
+  font-size: 13px;
 }
 .liv-pen li {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 8px;
-  color: var(--bad);
+  grid-template-columns: 72px 1fr 42px;
+  align-items: center;
+  gap: 3px 8px;
 }
-.liv-pen .liv-detail {
-  color: var(--ink-3);
+.liv-pen .liv-name,
+.liv-pen .liv-pts {
+  color: var(--bad);
 }
 
 /* 地价 */
@@ -792,22 +787,4 @@ button {
   z-index: 1;
   background: rgba(255, 255, 255, 0.86);
   border-radius: 50%;
-}
-.sheet .head-photo {
-  width: calc(100% + 70px);
-  margin: 0 -52px 12px -18px;
-  border-radius: 0;
-  max-height: 0;
-  aspect-ratio: auto;
-  transition:
-    max-height 0.36s cubic-bezier(0.22, 0.9, 0.3, 1),
-    opacity 0.4s ease;
-}
-.sheet.full .head-photo {
-  max-height: 210px;
-  height: 210px;
-}
-.sheet:not(.full) .head-photo {
-  margin-bottom: 0;
-  opacity: 0;
 }
