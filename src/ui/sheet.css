@@ -48,6 +48,10 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0 18px 24px;
+  scrollbar-width: none;
+}
+.sheet-body::-webkit-scrollbar {
+  display: none;
 }
 /* 收起时正文不可滚、不抢触摸，也不从标题下面露出一截 */
 .sheet-body {
