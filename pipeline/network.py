@@ -24,8 +24,16 @@ def walkable(tags: dict) -> bool:
     return True
 
 
-def build_network(elements: list[dict], to_local_xy, clip: tuple[float, float, float, float]) -> dict:
+def build_network(
+    elements: list[dict],
+    to_local_xy,
+    clip: tuple[float, float, float, float],
+    min_component: int | None = None,
+) -> dict:
     """clip = (minx, miny, maxx, maxy)，局部坐标；两端都在框外的边丢弃。
+
+    默认只留最大连通分量；给了 min_component 时，留下所有不少于这么多节点的分量
+    （区域步行网由片区与各车站周边拼成，彼此未必连通）。
 
     返回 {'nodes': float64[n,2], 'edges': int32[m,2], 'steps': bool[m]}
     """
@@ -73,8 +81,8 @@ def build_network(elements: list[dict], to_local_xy, clip: tuple[float, float, f
     n = len(xy)
     adj = coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(n, n))
     _, label = connected_components(adj, directed=False)
-    main = np.argmax(np.bincount(label))
-    keep = label == main
+    sizes = np.bincount(label)
+    keep = sizes[label] >= min_component if min_component else label == np.argmax(sizes)
     remap = -np.ones(n, dtype=np.int64)
     remap[keep] = np.arange(keep.sum())
     edge_keep = keep[e[:, 0]] & keep[e[:, 1]]
