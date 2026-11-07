@@ -62,75 +62,6 @@ button {
   border-radius: var(--radius);
 }
 
-/* 时间条 */
-.timebar {
-  left: 50%;
-  bottom: 20px;
-  transform: translateX(-50%);
-  width: min(720px, calc(100vw - 32px));
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.days {
-  display: flex;
-  gap: 6px;
-  border: 0;
-  padding: 0;
-}
-.chip {
-  border: 1px solid var(--line);
-  background: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 13px;
-}
-.chip small {
-  margin-left: 6px;
-  color: var(--ink-3);
-  font-size: 11px;
-}
-.chip.on {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #fff;
-}
-.chip.on small {
-  color: #cfccc4;
-}
-.clock {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.clock input[type="range"] {
-  flex: 1;
-  accent-color: var(--ink);
-}
-.play {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: none;
-  font-size: 11px;
-}
-.readout {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  min-width: 150px;
-}
-.readout .mono {
-  font-size: 20px;
-  font-weight: 600;
-}
-.readout small {
-  font-size: 11px;
-  color: var(--ink-3);
-}
-
 /* 色带（详情面板里用） */
 .ramp {
   position: relative;
@@ -480,9 +411,6 @@ button {
 @media (max-width: 720px) {
   .attribution-wrap {
     right: 12px;
-    bottom: 10px;
-  }
-  .timebar {
     bottom: 10px;
   }
   .inspector {
