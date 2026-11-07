@@ -61,6 +61,8 @@ interface AppState {
   livability: LivabilityResult | null;
   /** 正在显示视域的窗位（再点一次已选中的窗时打开） */
   viewshed: number | null;
+  /** 地图图层：路况、人流热度 */
+  layers: { traffic: boolean; crowd: boolean };
   setDate: (date: CivilDate) => void;
   setMinute: (minute: number) => void;
   /** 回到现在，并开始跟随 */
@@ -77,6 +79,7 @@ interface AppState {
   setReach: (r: Reach | null) => void;
   setLivability: (l: LivabilityResult | null) => void;
   toggleViewshed: (window: number) => void;
+  setLayer: (name: 'traffic' | 'crowd', on: boolean) => void;
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -92,6 +95,7 @@ export const useApp = create<AppState>((set, get) => ({
   reach: null,
   livability: null,
   viewshed: null,
+  layers: { traffic: true, crowd: true },
   setDate: (date) => set({ date, live: false }),
   setMinute: (minute) => set({ minute: ((minute % 1440) + 1440) % 1440, live: false }),
   goLive: () => set({ ...nowBeijing(), live: true, playing: false }),
@@ -108,4 +112,5 @@ export const useApp = create<AppState>((set, get) => ({
   setReach: (reach) => set({ reach }),
   setLivability: (livability) => set({ livability }),
   toggleViewshed: (window) => set({ viewshed: get().viewshed === window ? null : window }),
+  setLayer: (name, on) => set({ layers: { ...get().layers, [name]: on } }),
 }));

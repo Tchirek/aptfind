@@ -5,6 +5,7 @@ import { LivabilityController } from './app/livability';
 import { ReachController } from './app/reach';
 import { Scene } from './scene/Scene';
 import { Inspector } from './ui/Inspector';
+import { Layers } from './ui/Layers';
 import { SearchBox } from './ui/SearchBox';
 import { Splash } from './ui/Splash';
 import { TimeBar } from './ui/TimeBar';
@@ -18,6 +19,7 @@ function Main() {
       <LivabilityController data={data} />
       <Scene data={data} />
       <SearchBox data={data} />
+      <Layers />
       <TimeBar />
       <Inspector data={data} />
     </>

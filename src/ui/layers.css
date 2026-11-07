@@ -1,0 +1,154 @@
+.layers {
+  position: absolute;
+  z-index: 42;
+  top: 20px;
+  right: 24px;
+}
+/* 详情面板打开时它在面板上方，宽度一样，右缘对齐 */
+.layers-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--ink-2);
+  box-shadow:
+    0 1px 3px rgba(15, 30, 51, 0.18),
+    0 3px 10px rgba(15, 30, 51, 0.12);
+  transition:
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+.layers-btn:hover,
+.layers-btn.on {
+  color: var(--ink);
+}
+.layers-btn:active {
+  transform: scale(0.95);
+}
+.layers-pop {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  width: 248px;
+  padding: 12px 14px 14px;
+  box-shadow: 0 6px 24px rgba(15, 30, 51, 0.14);
+}
+.layers-title {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+.layers-row + .layers-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e6ecf3;
+}
+.lg-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 0 8px;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+}
+.lg-switch-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: #c9d3e0;
+  transition: background 0.2s ease;
+}
+.lg-switch-track span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 30, 51, 0.25);
+  transition: transform 0.2s ease;
+}
+.lg-switch.on .lg-switch-track {
+  background: var(--ink);
+}
+.lg-switch.on .lg-switch-track span {
+  transform: translateX(12px);
+}
+/* 路况图例：四档色块，下面是档名 */
+.lg-traffic {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+.lg-traffic span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.lg-traffic i {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+}
+/* 人流图例：由浅到深的紫色 */
+.lg-crowd {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.lg-crowd i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+}
+/* 宽屏左下角的常驻图例 */
+.layers-legend {
+  left: 24px;
+  bottom: 20px;
+  width: 200px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+.layers-legend-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+  gap: 6px;
+}
+.layers-legend-row b {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+  line-height: 14px;
+}
+/* 时间栏居中、最宽 760px：屏幕不够宽时左下角放不下，图例只在图层面板里看 */
+@media (max-width: 1239px) {
+  .layers-legend {
+    display: none;
+  }
+}
+@media (max-width: 720px) {
+  .layers {
+    top: calc(60px + env(safe-area-inset-top));
+    right: 8px;
+  }
+}

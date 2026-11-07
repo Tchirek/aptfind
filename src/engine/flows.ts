@@ -305,3 +305,38 @@ export function pedestrianLoad(w: RoadFlowWeights, f: PedestrianFactors): number
     0.8 * p.leisure * f.leisure;
   return Math.min(1, w.pedestrianBase * pull);
 }
+
+// ---------------------------------------------------------------- 路况分档与潮汐
+
+/** 路况四档，与通行的路况图惯例一致 */
+export const TRAFFIC_LEVELS = ['畅通', '缓行', '拥堵', '严重拥堵'] as const;
+export type TrafficLevel = 0 | 1 | 2 | 3;
+
+/** 压力（流量与通行能力之比的代理量）→ 路况档位 */
+export function trafficLevel(pressure: number): TrafficLevel {
+  if (pressure < 0.5) return 0;
+  if (pressure < 0.7) return 1;
+  if (pressure < 0.86) return 2;
+  return 3;
+}
+
+/** 片区到市中心（天府广场）的单位方向：西偏北，平面坐标以片区中心为原点 */
+const TO_CENTER = (() => {
+  const dx = -5203;
+  const dy = 4567;
+  const l = Math.hypot(dx, dy);
+  return [dx / l, dy / l] as const;
+})();
+
+const bump = (h: number, at: number, half: number) => Math.max(0, 1 - Math.abs(h - at) / half);
+
+/**
+ * 潮汐：工作日早高峰往市中心方向更挤，晚高峰出城方向更挤。
+ * (dx, dy) 是行车方向的单位向量；返回乘在压力上的系数。
+ */
+export function tidalFactor(dx: number, dy: number, minute: number, work: boolean): number {
+  if (!work) return 1;
+  const h = minute / 60;
+  const swing = bump(h, 8.25, 1.6) - bump(h, 18.25, 1.8);
+  return 1 + 0.16 * swing * (dx * TO_CENTER[0] + dy * TO_CENTER[1]);
+}

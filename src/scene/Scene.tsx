@@ -9,13 +9,13 @@ import { CameraRig } from './CameraRig';
 import { ENU_ROTATION_X } from './coords';
 import { DevHandle } from './DevHandle';
 import { Facades } from './Facades';
-import { Flows } from './Flows';
 import { Ground } from './Ground';
 import { Labels } from './Labels';
 import { Overlays } from './Overlays';
 import { Reach } from './Reach';
 import { Sun } from './Sun';
 import { TouchGestures } from './TouchGestures';
+import { Traffic } from './Traffic';
 import { Viewshed } from './Viewshed';
 
 /**
@@ -60,7 +60,7 @@ export function Scene({ data }: { data: SceneData }) {
         <Buildings data={data} />
         <Facades data={data} />
         <Overlays data={data} />
-        <Flows district={data.district} />
+        <Traffic district={data.district} />
         <Reach district={data.district} />
         <Viewshed data={data} />
       </group>
