@@ -76,8 +76,10 @@ export function computeIsochrone(
   const stations: ReachedStation[] = [];
   ride.arrival.forEach((t, station) => {
     const exit = t + p.exit;
-    // 上车站本身不算"坐过去"
-    if (!Number.isFinite(t) || exit >= budget || t === boards[station]) return;
+    if (!Number.isFinite(t) || exit >= budget) return;
+    // 直接走过去更快的站（包括上车站本身）不算"坐地铁到的"
+    const walkThere = (boards[station] as number) - p.board;
+    if (walkThere <= exit) return;
     stations.push({ station, arrival: t, exit });
   });
   for (const e of entrances) {
