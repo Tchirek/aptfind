@@ -48,10 +48,10 @@ export function Buildings({ data }: { data: SceneData }) {
   const { buildings } = data.district;
 
   const mesh = useMemo(() => {
-    const m = buildBuildingGeometry(buildings);
+    const m = buildBuildingGeometry(buildings, data.roofScores);
     m.geometry.computeBoundsTree();
     return m;
-  }, [buildings]);
+  }, [buildings, data.roofScores]);
   const material = useMemo(() => createBuildingMaterial(), []);
 
   const current = selectedBuilding(selection, data.grid);

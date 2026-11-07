@@ -18,6 +18,8 @@ export interface SceneData {
   dahanMinutes: Float32Array;
   /** 每栋楼在窗位网格里的区间 [起点, 数量]，没有窗位的楼数量为 0 */
   windowRange: Uint32Array;
+  /** 预计算的宜居评分（核心区住宅），屋顶按它着色；没有为 −1 */
+  roofScores: Int16Array;
 }
 
 interface SunlightMeta {
@@ -29,10 +31,13 @@ interface SunlightMeta {
 const base = import.meta.env.BASE_URL;
 
 async function load(): Promise<SceneData> {
-  const [district, meta, bin] = await Promise.all([
+  const [district, meta, bin, liv] = await Promise.all([
     loadDistrict(`${base}data/district.json`),
     fetch(`${base}data/sunlight-dahan.json`).then((r) => r.json() as Promise<SunlightMeta>),
     fetch(`${base}data/sunlight-dahan.bin`).then((r) => r.arrayBuffer()),
+    fetch(`${base}data/livability.json`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ gridHash: number; scores: number[] }>) : null))
+      .catch(() => null),
   ]);
   const grid = buildWindowGrid(district.buildings);
   if (grid.count !== meta.count || gridHash(grid) !== meta.gridHash) {
@@ -47,7 +52,12 @@ async function load(): Promise<SceneData> {
     if (windowRange[2 * b + 1] === 0) windowRange[2 * b] = i;
     windowRange[2 * b + 1] = (windowRange[2 * b + 1] as number) + 1;
   }
-  return { district, grid, dahanMinutes, windowRange };
+  // 评分与日照出自同一份窗位网格才用，否则屋顶不着色
+  const roofScores = new Int16Array(district.buildings.length).fill(-1);
+  if (liv && liv.gridHash === meta.gridHash && liv.scores.length === roofScores.length) {
+    roofScores.set(liv.scores);
+  }
+  return { district, grid, dahanMinutes, windowRange, roofScores };
 }
 
 export const sceneData: Promise<SceneData> = load();

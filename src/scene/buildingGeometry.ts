@@ -46,7 +46,36 @@ export interface BuildingMesh {
   vertexBuilding: Uint32Array;
 }
 
-export function buildBuildingGeometry(buildings: readonly Building[]): BuildingMesh {
+/**
+ * 宜居评分 → 屋顶色。取真实屋面常见的颜色：差的是砖红（陶瓦），中等是赭黄，
+ * 好的是橄榄到苔绿（种植屋面）；明度沿色阶变化，红绿色弱也分得开。
+ * 节点与评分的等级大致对齐：一般 ≤55、中等 70、良好 80、优秀 90。
+ */
+const ROOF_RAMP: [number, Color][] = [
+  [55, new Color('#9c6656')],
+  [70, new Color('#b49a72')],
+  [80, new Color('#a2a27c')],
+  [90, new Color('#7c9a70')],
+];
+
+export function roofColorOf(score: number, out = new Color()): Color {
+  const first = ROOF_RAMP[0] as [number, Color];
+  const last = ROOF_RAMP[ROOF_RAMP.length - 1] as [number, Color];
+  if (score <= first[0]) return out.copy(first[1]);
+  if (score >= last[0]) return out.copy(last[1]);
+  for (let i = 1; i < ROOF_RAMP.length; i++) {
+    const [s1, c1] = ROOF_RAMP[i] as [number, Color];
+    const [s0, c0] = ROOF_RAMP[i - 1] as [number, Color];
+    if (score <= s1) return out.copy(c0).lerp(c1, (score - s0) / (s1 - s0));
+  }
+  return out.copy(last[1]);
+}
+
+export function buildBuildingGeometry(
+  buildings: readonly Building[],
+  /** 每栋楼的宜居评分，−1 表示不着色（用默认屋顶色） */
+  scores?: Int16Array,
+): BuildingMesh {
   const pos: number[] = [];
   const facade: number[] = [];
   const color: number[] = [];
@@ -63,7 +92,13 @@ export function buildBuildingGeometry(buildings: readonly Building[]): BuildingM
     wall.set(palette[Math.floor(rand(b.index) * palette.length)] as string);
     // 同色系里再做一点明暗差，避免一片楼完全同色
     wall.multiplyScalar(0.96 + 0.08 * rand(b.index + 7919));
-    roof.copy(wall).lerp(ROOF_TINT, 0.6);
+    const score = scores?.[b.index] ?? -1;
+    if (score >= 0) {
+      // 同一档里也有一点明暗差，像真实的屋面
+      roofColorOf(score, roof).multiplyScalar(0.95 + 0.1 * rand(b.index + 104729));
+    } else {
+      roof.copy(wall).lerp(ROOF_TINT, 0.6);
+    }
     const z0 = b.base;
     const z1 = b.base + h;
     const before = pos.length;

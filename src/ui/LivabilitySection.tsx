@@ -1,7 +1,8 @@
 import { useApp } from '../app/store';
+import { roofColorOf } from '../scene/buildingGeometry';
 
-/** 选中楼的宜居评分：总分、逐项贡献（带依据）与扣分项 */
-export function LivabilitySection({ building }: { building: number }) {
+/** 选中楼的宜居评分：总分、逐项贡献（带依据）与扣分项；roof 为真时附上地图上这栋楼的屋顶色 */
+export function LivabilitySection({ building, roof }: { building: number; roof?: boolean }) {
   const livability = useApp((s) => s.livability);
   const mine = livability?.building === building ? livability : null;
 
@@ -18,6 +19,14 @@ export function LivabilitySection({ building }: { building: number }) {
     <section>
       <div className="label">宜居评分</div>
       <div className="liv-top">
+        {roof && (
+          <span
+            className="liv-roof"
+            style={{ background: `#${roofColorOf(mine.total).getHexString()}` }}
+            title="地图上这栋楼的屋顶色"
+            aria-hidden
+          />
+        )}
         <span className="liv-score mono">{mine.total}</span>
         <span className={`liv-grade ${mine.tone}`}>{mine.label}</span>
         <span className="liv-sum">{mine.summary}</span>
