@@ -197,14 +197,6 @@
   font-weight: 600;
 }
 
-.tb-live-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--good);
-  flex-shrink: 0;
-}
-
 .tb-sun-info {
   font-size: 11px;
   color: var(--ink-3);
@@ -212,13 +204,24 @@
 }
 
 .tb-go-live {
-  border: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
   background: none;
   padding: 0;
-  font-size: 12px;
-  color: var(--ink-3);
-  text-decoration: underline;
+  color: var(--ink-2);
   cursor: pointer;
+}
+.tb-go-live:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+/* 跟随现在时不显示，但占着位置 */
+.tb-go-live:disabled {
+  visibility: hidden;
 }
 
 @media (max-width: 720px) {

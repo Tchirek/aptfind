@@ -31,6 +31,30 @@ function PauseIcon() {
   );
 }
 
+/** 逆时针箭头绕着一个点：回到现在 */
+function NowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M3.2 6.2A5.2 5.2 0 1 1 3 9.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M1.6 3.4v3.4H5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function TimeBar() {
   const date = useApp((s) => s.date);
   const minute = useApp((s) => s.minute);
@@ -156,17 +180,22 @@ export function TimeBar() {
 
         <div className="tb-readout">
           <div className="tb-clock">
-            {live && <span className="tb-live-dot" />}
+            {/* 位置一直留着，手动改过时间才出现，不撑高面板 */}
+            <button
+              type="button"
+              className="tb-go-live"
+              onClick={goLive}
+              aria-label="回到现在"
+              title="回到现在"
+              disabled={live}
+            >
+              <NowIcon />
+            </button>
             <span className="mono tb-clock-time">{formatClock(minute)}</span>
           </div>
           <div className="tb-sun-info">
             日出 {formatClock(sunrise)} · 日落 {formatClock(sunset)}
           </div>
-          {!live && (
-            <button type="button" className="tb-go-live" onClick={goLive}>
-              回到现在
-            </button>
-          )}
         </div>
       </div>
     </div>
