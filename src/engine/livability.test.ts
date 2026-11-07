@@ -177,7 +177,7 @@ describe('物业与底商', () => {
 
   it('楼下一排饭馆扣分，十分钟内餐饮再多也不加分', () => {
     const r = scoreLivability({ ...good, foodAdjacent: 10 });
-    expect(r.penalties.find((p) => p.label === '油烟与夜宵噪声')?.points).toBeCloseTo(3, 5);
+    expect(r.penalties.find((p) => p.label === '油烟扰民')?.points).toBeCloseTo(3, 5);
     const a = (n: number) =>
       scoreLivability({ ...good, within10: { ...good.within10, food: n } }).dimensions.find(
         (d) => d.key === 'amenity',

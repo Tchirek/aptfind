@@ -342,7 +342,7 @@ function adjacentFoodPenalty(facts: LivabilityFacts): Penalty | null {
   if (n < 2) return null;
   const points = 3 * Math.min(1, n / 8);
   const facts2 = [{ label: '楼下餐饮', value: `${n} 家` }];
-  return { label: '油烟与夜宵噪声', points, facts: facts2, detail: joinFacts(facts2) };
+  return { label: '油烟扰民', points, facts: facts2, detail: joinFacts(facts2) };
 }
 
 /** 交通噪声：快速路影响最远、扣得最多，主干道次之，次干道只管贴边的楼；取最重的一条 */
