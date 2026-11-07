@@ -19,7 +19,17 @@ export function DevHandle() {
         st.camera.updateProjectionMatrix();
       }
       for (let i = 0; i < 4; i++) st.advance(performance.now());
-      const url = st.gl.domElement.toDataURL('image/jpeg', 0.85);
+      // WebGL 画布与叠在上面的标注画布合成一张
+      const out = document.createElement('canvas');
+      out.width = st.gl.domElement.width;
+      out.height = st.gl.domElement.height;
+      const ctx = out.getContext('2d');
+      if (!ctx) return 0;
+      ctx.drawImage(st.gl.domElement, 0, 0);
+      for (const c of st.gl.domElement.parentElement?.querySelectorAll('canvas') ?? []) {
+        if (c !== st.gl.domElement) ctx.drawImage(c, 0, 0, out.width, out.height);
+      }
+      const url = out.toDataURL('image/jpeg', 0.85);
       const res = await fetch(`/__collect?name=${encodeURIComponent(name)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

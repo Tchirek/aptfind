@@ -9,6 +9,7 @@ import { ENU_ROTATION_X } from './coords';
 import { DevHandle } from './DevHandle';
 import { Facades } from './Facades';
 import { Ground } from './Ground';
+import { Labels } from './Labels';
 import { Overlays } from './Overlays';
 import { Reach } from './Reach';
 import { Sun } from './Sun';
@@ -44,6 +45,7 @@ export function Scene({ data }: { data: SceneData }) {
         screenSpacePanning={false}
       />
       <CameraRig />
+      <Labels district={data.district} />
       {import.meta.env.DEV && <DevHandle />}
     </Canvas>
   );
