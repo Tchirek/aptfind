@@ -92,7 +92,37 @@ export function TimeBar() {
   const compact = useMedia(SHEET_QUERY);
   const [open, setOpen] = useState(false);
   const shown = !compact || open;
-  const swipe = useRef<number | null>(null);
+  const swipe = useRef<{ y: number; t: number; moved: boolean } | null>(null);
+
+  /** 拖把手：往上有限位（越拉越拉不动，最多十几像素），往下跟手，放开时够远或够快就收起 */
+  const dragTo = (dy: number | null) => {
+    const el = ref.current;
+    if (!el) return;
+    el.classList.toggle('dragging', dy !== null);
+    el.style.setProperty('--tb-drag', `${dy ?? 0}px`);
+  };
+  const onGripDown = (e: React.PointerEvent) => {
+    swipe.current = { y: e.clientY, t: performance.now(), moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onGripMove = (e: React.PointerEvent) => {
+    const s = swipe.current;
+    if (!s) return;
+    const dy = e.clientY - s.y;
+    if (!s.moved && Math.abs(dy) < 5) return;
+    s.moved = true;
+    dragTo(dy < 0 ? -16 * (1 - Math.exp(dy / 40)) : dy);
+  };
+  const onGripUp = (e: React.PointerEvent) => {
+    const s = swipe.current;
+    swipe.current = null;
+    dragTo(null);
+    if (!s) return;
+    const dy = e.clientY - s.y;
+    const v = dy / Math.max(1, performance.now() - s.t);
+    // 点一下也收起
+    if (!s.moved || dy > 48 || v > 0.4) setOpen(false);
+  };
 
   const { sunrise, sunset } = dayTimes(date);
 
@@ -178,14 +208,12 @@ export function TimeBar() {
             type="button"
             className="tb-grip"
             aria-label="收起"
-            onClick={() => setOpen(false)}
-            onPointerDown={(e) => {
-              swipe.current = e.clientY;
-            }}
-            onPointerUp={(e) => {
-              // 往下一划也收起
-              if (swipe.current !== null && e.clientY - swipe.current > 24) setOpen(false);
-              swipe.current = null;
+            onPointerDown={onGripDown}
+            onPointerMove={onGripMove}
+            onPointerUp={onGripUp}
+            onPointerCancel={onGripUp}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setOpen(false);
             }}
           >
             <i />

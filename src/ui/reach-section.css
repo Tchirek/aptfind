@@ -37,6 +37,8 @@
 .reach-stations {
   display: flex;
   flex-wrap: wrap;
+  /* 一行里各格保持自己的高度，不被同行最高的那个撑开 */
+  align-items: flex-start;
   gap: 4px;
   margin-top: 8px;
   list-style: none;
@@ -53,15 +55,23 @@
 }
 
 .reach-toggle {
+  position: relative;
+  display: block;
   font-size: 12px;
   line-height: 1;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 2px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  padding: 3px 6px;
   background: none;
   color: var(--ink-2);
   cursor: pointer;
   white-space: nowrap;
+}
+/* 触控区比看得见的格子大，格子本身与站名一样扁 */
+.reach-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -8px -4px;
 }
 
 .reach-toggle:hover {

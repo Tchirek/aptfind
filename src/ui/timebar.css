@@ -189,9 +189,17 @@
   gap: 6px;
 }
 
+/* 时刻占固定宽度、右对齐：不论数字宽窄，时刻与左边的返回键都不挪位置 */
 .tb-clock-time {
+  display: inline-block;
+  width: 3.05em;
+  text-align: right;
   font-size: 20px;
   font-weight: 600;
+  white-space: nowrap;
+}
+.tb-go-live {
+  flex-shrink: 0;
 }
 
 .tb-sun-info {
@@ -225,10 +233,9 @@
   .timebar {
     left: 8px;
     right: 8px;
-    bottom: calc(8px + env(safe-area-inset-bottom) + var(--sheet-h, 0px));
+    bottom: calc(8px + env(safe-area-inset-bottom));
     width: auto;
     transform: none;
-    transition: bottom 0.36s cubic-bezier(0.22, 0.9, 0.3, 1);
     padding: 8px 10px;
     gap: 6px;
   }
@@ -289,13 +296,19 @@
   display: none;
 }
 @media (max-width: 720px) and (min-height: 501px) {
+  /* 浮在详情抽屉上沿（--sheet-h），拖动时跟手（--tb-drag）；都走 translate，不触发重排 */
   .timebar {
     padding-top: 2px;
+    translate: 0 calc(var(--tb-drag, 0px) - var(--sheet-h, 0px));
     transition:
-      bottom 0.36s cubic-bezier(0.22, 0.9, 0.3, 1),
+      translate 0.34s cubic-bezier(0.22, 0.9, 0.3, 1),
       transform 0.32s cubic-bezier(0.22, 0.9, 0.3, 1),
       opacity 0.2s ease;
     box-shadow: 0 4px 20px rgba(15, 30, 51, 0.12);
+    will-change: translate, transform;
+  }
+  .timebar.dragging {
+    transition: none;
   }
   .timebar.away {
     transform: translateY(calc(100% + 24px));
@@ -324,7 +337,8 @@
     position: absolute;
     z-index: 41;
     right: 12px;
-    bottom: calc(16px + env(safe-area-inset-bottom) + var(--sheet-h, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    translate: 0 calc(-1 * var(--sheet-h, 0px));
     display: inline-flex;
     align-items: center;
     gap: 7px;
@@ -340,7 +354,7 @@
       0 1px 3px rgba(15, 30, 51, 0.18),
       0 4px 14px rgba(15, 30, 51, 0.14);
     transition:
-      bottom 0.36s cubic-bezier(0.22, 0.9, 0.3, 1),
+      translate 0.34s cubic-bezier(0.22, 0.9, 0.3, 1),
       transform 0.25s ease,
       opacity 0.2s ease;
   }
