@@ -111,6 +111,8 @@ def load_pois(raw: Path) -> list[Poi]:
 
 # 指名标出的连锁品牌：类别名 → 店名须以它开头（排除"甜品站""取餐点"与以公司名登记的重复点）
 BRANDS = {"mcdonalds": "麦当劳", "starbucks": "星巴克", "haidilao": "海底捞"}
+# 成都本地的连锁商超：从超市便利店里挑出来（门店多，片区内就有二十多家）
+GROCERY_BRANDS = {"hongqi": ("红旗连锁", "红旗超市")}
 BRAND_EXCLUDE = re.compile(r"(甜品站|取餐点|外送|外卖)")
 
 
@@ -128,6 +130,17 @@ def load_brands(raw: Path) -> list[Poi]:
         seen.add(p["id"])
         lon, lat = parse_location(p["location"])
         out.append(Poi(cat, name, p.get("type", ""), lon, lat))
+    # 商超品牌从超市便利店的采集结果里挑，原记录仍留在"超市便利"一类
+    g = raw / "poi-grocery.json"
+    if g.exists():
+        for p in json.loads(g.read_text(encoding="utf-8")):
+            name = p["name"]
+            cat = next((k for k, v in GROCERY_BRANDS.items() if name.startswith(v)), None)
+            if cat is None or p["id"] in seen:
+                continue
+            seen.add(p["id"])
+            lon, lat = parse_location(p["location"])
+            out.append(Poi(cat, name, p.get("type", ""), lon, lat))
     return out
 
 

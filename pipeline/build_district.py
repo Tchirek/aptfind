@@ -52,6 +52,11 @@ OUT = ROOT / "public" / "data" / "district.json"
 SURVEY = ROOT / "pipeline" / "survey.csv"
 SURVEY_TODO = ROOT / "pipeline" / "survey_todo.csv"
 COMPOUND_INFO = ROOT / "pipeline" / "compound_info.csv"
+COMPOUND_HEIGHTS = ROOT / "pipeline" / "compound_heights.csv"
+# 每户住宅建筑面积（含公摊），由户数反推塔楼层数用
+GFA_PER_HOUSEHOLD = 100.0
+# 没有公开最高层数时的上限：成都住宅塔楼绝大多数在 100 m（约 34 层）以下
+DEFAULT_MAX_FLOORS = 34
 NAME_OVERRIDES = ROOT / "pipeline" / "names.csv"
 NAMES_TODO = ROOT / "pipeline" / "names_todo.csv"
 
@@ -646,6 +651,73 @@ def main() -> None:
                 label = None
         b["label"] = label
 
+    # ---------------- 楼高校正
+    # CBMF 的高度由遥感反演，高层普遍被压低（OSM 标了 35、38 层的塔楼在 CBMF 里只有 7–14 层）。
+    # 1) OSM 上标了 building:levels 的楼直接用它；
+    # 2) compound_heights.csv 里查到楼栋数的小区：CBMF 里最高的 N 个足迹算作塔楼，层数由住宅面积反推——
+    #    有户数时按 户数 × 每户 100 m²（含公摊）÷ 塔楼足迹面积之和；
+    #    没有户数时按 容积率 × 用地面积 ÷ 塔楼足迹面积之和（OSM 的小区边界常比实际用地小，这样算偏低）；
+    #    都不超过公开的最高层数。
+    # 两步都只往高里改，实地核验（survey.csv）的楼不动。
+    osm_levels: list[tuple[Polygon, int]] = []
+    for el in elements:
+        tags = el.get("tags", {})
+        if "building:levels" not in tags or not ("building" in tags or "building:part" in tags):
+            continue
+        try:
+            levels = int(float(tags["building:levels"]))
+        except ValueError:
+            continue
+        g = area_geometry(el)
+        osm_levels += [(p, levels) for p in explode_polygons(to_local(g) if g is not None else None)]
+    level_tree = STRtree([p for p, _ in osm_levels]) if osm_levels else None
+    raised: Counter = Counter()
+    for b in buildings:
+        if level_tree is None or b["src"] == "survey":
+            continue
+        best = max(
+            ((osm_levels[int(j)][0].intersection(b["poly"]).area / b["poly"].area, osm_levels[int(j)][1])
+             for j in level_tree.query(b["poly"], predicate="intersects")),
+            default=(0.0, 0),
+        )
+        if best[0] >= 0.3 and best[1] > b["floors"]:
+            b["floors"] = best[1]
+            b["height"] = best[1] * FLOOR_HEIGHT
+            b["src"] = "osm"
+            raised["OSM 层数"] += 1
+
+    with COMPOUND_HEIGHTS.open(encoding="utf-8") as f:
+        plans = list(csv.DictReader(f))
+    by_compound_name = {c["name"]: k for k, c in enumerate(compounds)}
+    for row in plans:
+        names = row["names"].split("|")
+        ks = {by_compound_name[n] for n in names if n in by_compound_name}
+        if not ks:
+            print(f"  楼高校正：找不到小区 {row['names']}", file=sys.stderr)
+            continue
+        site = shapely.union_all([p for k in ks for p in compounds[k]["parts"]]).area
+        members = [b for b in buildings if b["compound"] in ks and b["src"] == "cbmf" and b["poly"].area >= 250]
+        towers = sorted(members, key=lambda b: (-b["height"], -b["poly"].area))[: int(row["towers"])]
+        if not towers:
+            continue
+        foot = sum(b["poly"].area for b in towers)
+        cap = int(row["max_floors"]) if row.get("max_floors") else DEFAULT_MAX_FLOORS
+        gfa = int(row["households"]) * GFA_PER_HOUSEHOLD if row.get("households") else float(row["far"]) * site
+        floors = max(1, min(cap, round(gfa / foot)))
+        for b in towers:
+            if floors > b["floors"]:
+                b["floors"] = floors
+                b["height"] = floors * FLOOR_HEIGHT
+                b["src"] = "plan"
+                raised["容积率推算"] += 1
+        print(f"  楼高校正 {names[0]}：{'户数' if row.get('households') else '容积率'}，{len(towers)} 栋塔楼足迹 {foot:.0f} m² → {floors} 层", file=sys.stderr)
+        if row.get("built_year"):
+            for n in names:
+                info.setdefault(n, {"name": n, "built_year": "", "note": ""})
+                if not info[n].get("built_year"):
+                    info[n]["built_year"] = row["built_year"]
+    print(f"  楼高校正：{dict(raised)}", file=sys.stderr)
+
     # ---------------- 设施
     pois: list[dict] = []
     for p in amap.load_pois(AMAP_RAW):
@@ -688,7 +760,8 @@ def main() -> None:
     water += [{"l": line_dm(l.simplify(1.0).coords), "w": w} for l, w in water_lines if l.intersects(outer_local.buffer(200))]
 
     attribution = [
-        "建筑：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），高度源自 3D-GloBFP",
+        "建筑：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），高度源自 3D-GloBFP；"
+        "高层住宅的层数按 OSM 标注与房天下、链家等公开的小区楼栋数、户数、容积率校正",
         terrain.ATTRIBUTION,
         "道路、步行网、地铁线路、边界、水系：© OpenStreetMap contributors（ODbL）",
     ]
