@@ -35,7 +35,12 @@ function Main() {
       <SearchBox data={data} />
       <TimeBar />
       <Inspector data={data} />
-      <Attribution lines={data.district.attribution} />
+      <Attribution
+        lines={[
+          ...data.district.attribution,
+          '星表：HYG Database v4.1（astronexus，CC BY-SA 4.0）',
+        ]}
+      />
     </>
   );
 }

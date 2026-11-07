@@ -11,6 +11,7 @@
 
 import { Color, MeshStandardMaterial } from 'three';
 import { sceneUniforms } from './lighting';
+import { withSkyFog } from './skyLayer';
 
 export const buildingUniforms = {
   uSelected: { value: -1 },
@@ -129,5 +130,5 @@ export function createBuildingMaterial(): MeshStandardMaterial {
       );
   };
   m.customProgramCacheKey = () => 'jg-building-v1';
-  return m;
+  return withSkyFog(m);
 }

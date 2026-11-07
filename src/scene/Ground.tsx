@@ -12,6 +12,7 @@ import {
 } from './groundTexture';
 import { sceneUniforms } from './lighting';
 import { withReach } from './reachLayer';
+import { withSkyFog } from './skyLayer';
 
 /** 地形网格（ENU，z 向上），UV 按平面坐标铺满地面贴图 */
 function terrainGeometry(d: District): BufferGeometry {
@@ -67,20 +68,22 @@ export function Ground({ district }: { district: District }) {
 
   const terrain = useMemo(
     () =>
-      withReach(
-        new MeshStandardMaterial({
-          map: textures.map,
-          roughness: 1,
-          emissiveMap: textures.glow,
-          emissive: new Color('#ffb36b'),
-          emissiveIntensity: 0,
-        }),
-        'terrain',
+      withSkyFog(
+        withReach(
+          new MeshStandardMaterial({
+            map: textures.map,
+            roughness: 1,
+            emissiveMap: textures.glow,
+            emissive: new Color('#ffb36b'),
+            emissiveIntensity: 0,
+          }),
+          'terrain',
+        ),
       ),
     [textures],
   );
   const far = useMemo(
-    () => withReach(new MeshStandardMaterial({ color: GROUND, roughness: 1 }), 'far'),
+    () => withSkyFog(withReach(new MeshStandardMaterial({ color: GROUND, roughness: 1 }), 'far')),
     [],
   );
 

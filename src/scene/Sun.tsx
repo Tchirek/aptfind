@@ -1,69 +1,25 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import {
-  BackSide,
-  Color,
-  type DirectionalLight,
-  Fog,
-  type HemisphereLight,
-  type Mesh,
-  ShaderMaterial,
-  Vector3,
-} from 'three';
+import { Color, type DirectionalLight, Fog, type HemisphereLight, Vector3 } from 'three';
 import { useApp } from '../app/store';
 import { sunAt } from '../app/time';
 import { sunDirectionEnu } from '../engine/solar';
 import { enuToWorld } from './coords';
 import { lightPreset, litShare, sceneUniforms } from './lighting';
-
-/** 天空：按视线仰角在地平线色与天顶色之间过渡，太阳附近略亮 */
-function skyMaterial() {
-  return new ShaderMaterial({
-    side: BackSide,
-    depthWrite: false,
-    fog: false,
-    uniforms: {
-      uHorizon: { value: new Color() },
-      uZenith: { value: new Color() },
-      uSunDir: { value: new Vector3(0, 1, 0) },
-      uSunGlow: { value: 0 },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vDir;
-      void main() {
-        vDir = normalize(position);
-        vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        gl_Position = p.xyww;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform vec3 uHorizon;
-      uniform vec3 uZenith;
-      uniform vec3 uSunDir;
-      uniform float uSunGlow;
-      varying vec3 vDir;
-      void main() {
-        float h = clamp(vDir.y, 0.0, 1.0);
-        vec3 c = mix(uHorizon, uZenith, pow(h, 0.55));
-        float glow = pow(max(dot(normalize(vDir), uSunDir), 0.0), 24.0) * uSunGlow;
-        c += vec3(1.0, 0.86, 0.68) * glow * 0.35;
-        gl_FragColor = vec4(c, 1.0);
-        #include <colorspace_fragment>
-      }
-    `,
-  });
-}
+import { Sky, skyState } from './Sky';
 
 /**
  * 场景的光：按所选日期与时刻的真实太阳位置打平行光并投影，
  * 天空、雾、环境光随太阳高度在白天、黄昏、夜晚之间过渡，夜里窗户按时段亮灯。
  */
+const WHITE = new Color('#ffffff');
+const skyLight = new Color();
+
 export function Sun() {
   const date = useApp((s) => s.date);
   const minute = useApp((s) => s.minute);
   const light = useRef<DirectionalLight>(null);
   const hemi = useRef<HemisphereLight>(null);
-  const sky = useRef<Mesh>(null);
   const { controls, camera, scene } = useThree();
 
   const sun = useMemo(() => {
@@ -72,26 +28,11 @@ export function Sun() {
     return { dir: dir.normalize(), elevation: p.apparentElevation };
   }, [date, minute]);
   const preset = useMemo(() => lightPreset(sun.elevation), [sun.elevation]);
-  const material = useMemo(() => skyMaterial(), []);
 
   useEffect(() => {
     sceneUniforms.uNight.value = preset.night;
     sceneUniforms.uLitShare.value = litShare(minute);
-    sceneUniforms.uSky.value.copy(preset.zenith).lerp(preset.horizon, 0.5);
-    const u = material.uniforms as {
-      uHorizon: { value: Color };
-      uZenith: { value: Color };
-      uSunDir: { value: Vector3 };
-      uSunGlow: { value: number };
-    };
-    u.uHorizon.value.copy(preset.horizon);
-    u.uZenith.value.copy(preset.zenith);
-    u.uSunDir.value.copy(sun.dir);
-    u.uSunGlow.value = Math.max(0, 1 - Math.abs(sun.elevation) / 20);
-    scene.background = preset.horizon.clone();
-    if (scene.fog instanceof Fog) scene.fog.color.copy(preset.horizon);
-    else scene.fog = new Fog(preset.horizon.clone(), 3000, 9000);
-  }, [preset, sun, minute, material, scene]);
+  }, [preset, minute]);
 
   useEffect(() => {
     const l = light.current;
@@ -126,14 +67,20 @@ export function Sun() {
       scene.fog.near = Math.max(2400, dist * 2.2);
       scene.fog.far = Math.max(9000, dist * 6);
     }
-    sky.current?.position.copy(camera.position);
+    // 光色取自大气模型：直射光是穿过大气后的太阳色，天光是天顶附近的天色
+    if (l) l.color.copy(skyState.sunColor);
+    const h = hemi.current;
+    if (h) {
+      sceneUniforms.uSky.value.copy(skyState.zenith).lerp(skyState.horizon, 0.4);
+      h.color
+        .copy(skyLight.copy(skyState.zenith).lerp(WHITE, 0.55))
+        .lerp(preset.skyLight, preset.night);
+    }
   });
 
   return (
     <>
-      <mesh ref={sky} material={material} renderOrder={-10} frustumCulled={false}>
-        <sphereGeometry args={[1000, 32, 16]} />
-      </mesh>
+      <Sky />
       <hemisphereLight
         ref={hemi}
         args={[preset.skyLight, preset.groundLight, preset.ambient]}
@@ -150,7 +97,6 @@ export function Sun() {
       <directionalLight
         ref={light}
         intensity={preset.sunIntensity}
-        color={preset.sunColor}
         castShadow
         shadow-mapSize={[4096, 4096]}
         shadow-camera-near={10}
