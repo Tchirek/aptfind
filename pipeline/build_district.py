@@ -827,6 +827,15 @@ def main() -> None:
             lon, lat = TO_WGS.transform(c.x, c.y)
             pts.append({"id": b["id"], "lon": round(lon, 7), "lat": round(lat, 7)})
     (AMAP_RAW / "input-points.json").write_text(json.dumps(pts), encoding="utf-8")
+    # 高德采集的输入：小区、校园的中心点（找题图用）
+    cpts = []
+    for c in compounds:
+        if c["kind"] not in ("residential", "school"):
+            continue
+        p = max(c["parts"], key=lambda q: q.area).representative_point()
+        lon, lat = TO_WGS.transform(p.x, p.y)
+        cpts.append({"name": c["name"], "kind": c["kind"], "lon": round(lon, 6), "lat": round(lat, 6)})
+    (AMAP_RAW / "compound-points.json").write_text(json.dumps(cpts, ensure_ascii=False), encoding="utf-8")
     # 高德采集的输入：OSM 里没有名字的道路，沿线取样点
     (AMAP_RAW / "road-points.json").write_text(json.dumps(road_points), encoding="utf-8")
 

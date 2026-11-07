@@ -61,6 +61,28 @@ pipeline/.venv/Scripts/python pipeline/build_region.py                # 写出 p
 出行参数（进站候车 5 分、换乘 5 分、出站 2 分、步速 75 m/min、普线 520 m/min）写在 `build_region.py` 顶部，
 随 region.json 一起交给前端。`npx tsx scripts/bench-isochrone.ts <楼名>` 可以用真实数据跑一遍看耗时与结果。
 
+## 高层楼高校正
+
+CBMF 的楼高由遥感反演，高层普遍被压低。`build_district.py` 在写出前做两步只往高里改的校正：
+
+1. OSM 上标了 `building:levels` 的楼（与 CBMF 足迹重叠 30% 以上）直接用 OSM 的层数；
+2. `compound_heights.csv` 里每行一个高层小区（同一项目分期写在一起，用 `|` 分隔），记楼栋数、户数、容积率、
+   公开的最高层数、建成年代与出处。CBMF 里该小区最高的 N 个足迹（≥ 250 m²）算塔楼，
+   层数 = 户数 × 100 m² ÷ 塔楼足迹面积之和；没有户数时用 容积率 × 小区用地面积。
+   不超过公开的最高层数，没有时不超过 34 层（约 100 m）。
+
+运行时会逐个小区打印推算结果，与公开的层数区间对照。改过楼高后要重跑 `npm run data:sunlight`。
+
+## 小区题图
+
+在采集页执行 `await jgCollect.photos()`（读 `compound-points.json`），再运行：
+
+```bash
+python pipeline/build_photos.py
+```
+
+只收地点名与地块名对得上的照片；`REJECT` 里是逐张看过后剔除的（不是这个地块的照片）。
+
 ## 楼高实地核验
 
 CBMF 的楼高由遥感反演，高层容易被低估。`survey_todo.csv` 列出核心区里最高的 40 栋住宅，
