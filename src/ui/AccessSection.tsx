@@ -24,6 +24,7 @@ const ROWS: Row[] = [
   { category: 'metro', label: '地铁' },
   { category: 'bus', label: '公交' },
   { category: 'grocery', label: '超市便利' },
+  { category: 'hongqi', label: '红旗连锁', logo: 'hongqi' },
   { category: 'market', label: '菜市场' },
   { category: 'food', label: '餐饮', countOnly: true },
   { category: 'medical', label: '医疗' },

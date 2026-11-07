@@ -20,8 +20,8 @@ export const CLASS_LABEL: Record<BuildingClass, string> = {
   U: '其他',
 };
 
-/** 楼高来源：遥感反演、实地数层、用户在页面上改过 */
-export type HeightSource = 'cbmf' | 'survey' | 'user';
+/** 楼高来源：遥感反演、OSM 标注的层数、按小区户数与楼栋数推算、实地数层、用户在页面上改过 */
+export type HeightSource = 'cbmf' | 'osm' | 'plan' | 'survey' | 'user';
 
 export interface Building {
   index: number;
@@ -82,7 +82,8 @@ export type PoiCategory =
   /** 指名标出的连锁品牌 */
   | 'mcdonalds'
   | 'starbucks'
-  | 'haidilao';
+  | 'haidilao'
+  | 'hongqi';
 
 export const BRAND_CATEGORIES = ['mcdonalds', 'starbucks', 'haidilao'] as const;
 
@@ -157,7 +158,7 @@ interface DistrictJson {
     f: number;
     z: number;
     c: BuildingClass;
-    s: 'cbmf' | 'survey';
+    s: 'cbmf' | 'osm' | 'plan' | 'survey';
     k?: number;
     n?: string;
     core?: 1;
