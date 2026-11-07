@@ -70,6 +70,10 @@ function viewshedMaterial(): ShaderMaterial {
     transparent: true,
     depthWrite: false,
     side: DoubleSide,
+    // 命中处与外墙几乎共面，再往镜头方向让一点，免得转动镜头时与外墙争深度而闪烁
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -4,
     uniforms: {
       uEye: { value: new Vector3() },
       uReveal: { value: 0 },
@@ -88,7 +92,9 @@ function viewshedMaterial(): ShaderMaterial {
       varying float vFront;
       varying vec2 vUv;
       void main() {
-        float d = min(aDist, uReveal);
+        // 打在楼或地上的点往眼睛方向收回一点（远处收得多些，深度精度差），不与外墙共面
+        float pull = aHit > 0.5 ? min(3.0, 0.3 + aDist * 0.004) : 0.0;
+        float d = min(max(aDist - pull, 0.0), uReveal);
         vD = d;
         vHit = aHit;
         // 还没涨到命中处的顶点停在波前上
@@ -114,7 +120,8 @@ function viewshedMaterial(): ShaderMaterial {
         vec2 w = fwidth(g);
         vec2 f = abs(fract(g + 0.5) - 0.5);
         vec2 l = 1.0 - smoothstep(vec2(0.0), w * 1.5, f);
-        float line = max(l.x, l.y);
+        // 掠射角下一个像素里挤了好几条线，会闪成摩尔纹，这时淡掉
+        float line = max(l.x, l.y) * (1.0 - smoothstep(0.12, 0.45, max(w.x, w.y)));
         // 打在楼或地面上的部分实一些；一直看到最远的天空部分只留一层薄雾
         float a = mix(0.05, mix(0.4, 0.2, t), vHit);
         a += line * mix(0.05, 0.35, vHit) * (1.0 - t * 0.6);

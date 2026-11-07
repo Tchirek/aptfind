@@ -16,6 +16,13 @@ import {
   vertexToWindow,
 } from './facadeGeometry';
 
+/** 眼睛形状的光标（白描边，压在任何外墙色上都看得清） */
+const EYE_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'>" +
+  "<path d='M3 14c3-5.2 6.8-7.8 11-7.8S22 8.8 25 14c-3 5.2-6.8 7.8-11 7.8S6 19.2 3 14z' fill='%230f1e33' stroke='white' stroke-width='2'/>" +
+  "<circle cx='14' cy='14' r='3.6' fill='white'/></svg>";
+const EYE_CURSOR = `url("data:image/svg+xml;utf8,${EYE_SVG}") 14 14, pointer`;
+
 /** 窗位的框：四条细边，比窗格再往外抬一点 */
 function frameGeometry(grid: WindowGrid, i: number, width: number): BufferGeometry {
   const x0 = grid.x0[i] as number;
@@ -74,7 +81,6 @@ export function Facades({ data }: { data: SceneData }) {
   const selection = useApp((s) => s.selection);
   const select = useApp((s) => s.select);
   const toggleViewshed = useApp((s) => s.toggleViewshed);
-  const viewshed = useApp((s) => s.viewshed);
   const requestFly = useApp((s) => s.requestFly);
   const sunlight = useApp((s) => s.sunlight);
   const { grid } = data;
@@ -155,7 +161,8 @@ export function Facades({ data }: { data: SceneData }) {
           e.stopPropagation();
           const i = toWindow(e);
           setHover(i === null ? null : { building, index: i });
-          document.body.style.cursor = 'pointer';
+          // 已选中的窗：光标换成眼睛，提示再点一下能看视域
+          document.body.style.cursor = i !== null && i === selectedWindow ? EYE_CURSOR : 'pointer';
         }}
         onPointerOut={() => {
           setHover(null);
@@ -185,7 +192,6 @@ export function Facades({ data }: { data: SceneData }) {
           <span className="mono">
             {Number.isNaN(hoverMinutes) ? '…' : formatDuration(hoverMinutes)}
           </span>
-          {hover === selectedWindow && <i>{viewshed === hover ? '再点收起视野' : '再点看视野'}</i>}
         </Html>
       )}
     </group>
