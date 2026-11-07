@@ -38,7 +38,8 @@ export default defineConfig({
   base: './',
   plugins: [react(), collectPlugin()],
   worker: { format: 'es' },
-  build: { target: 'es2023', sourcemap: true },
+  // 部署包不带 source map（约 8 MB），排查线上问题时临时打开
+  build: { target: 'es2023', sourcemap: false },
   test: {
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
   },
