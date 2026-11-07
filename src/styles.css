@@ -459,3 +459,46 @@ button {
 .window-tip span {
   color: #d9d5cc;
 }
+
+/* 选中楼的日照概况 */
+.sun-stats {
+  display: flex;
+  gap: 18px;
+  margin: 2px 0 10px;
+}
+.sun-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sun-stats small {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.sun-stats b {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sun-ramp {
+  margin: 0;
+}
+
+/* 窗位详情回到整栋楼 */
+.inspector-head .back {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.inspector-head .back:hover {
+  text-decoration: underline;
+}
+
+/* 时段条上的当前时刻 */
+.timeline line.now {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}

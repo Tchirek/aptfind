@@ -3,12 +3,13 @@ import { getEngine, type SceneData } from '../app/data';
 import { formatClock, formatDuration, windowOrientation } from '../app/format';
 import { buildingTitle } from '../app/search';
 import { useApp } from '../app/store';
-import { daylightSpec, formatDate } from '../app/time';
+import { daylightSpec, dayTimes, formatDate } from '../app/time';
 import { type Building, CLASS_LABEL, type District } from '../engine/district';
 import { floorsOf } from '../engine/geometry';
 import { AWAY, LIT, type Span, SunPath, TERRAIN } from '../engine/sunlight';
 import { AccessSection } from './AccessSection';
-import { THRESHOLD_MINUTES } from './palette';
+import { THRESHOLD_MINUTES, warmSpanFor } from './palette';
+import { SunRamp } from './SunRamp';
 import { Timeline } from './Timeline';
 import { ViewSection } from './ViewSection';
 
@@ -51,9 +52,25 @@ function Verdict({ minutes }: { minutes: number }) {
   );
 }
 
-function Head({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) {
+function Head({
+  eyebrow,
+  title,
+  sub,
+  back,
+}: {
+  eyebrow: string;
+  title: string;
+  sub?: string;
+  /** 从窗位回到整栋楼 */
+  back?: () => void;
+}) {
   return (
     <header className="inspector-head">
+      {back && (
+        <button type="button" className="back" onClick={back}>
+          ‹ 整栋楼
+        </button>
+      )}
       <div className="eyebrow">{eyebrow}</div>
       <h2>{title}</h2>
       {sub && <p className="sub">{sub}</p>}
@@ -61,9 +78,54 @@ function Head({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: s
   );
 }
 
+/** 选中楼在所选日期的日照概况：边算边显示进度，算完给出最少、中位、最多，附外墙色带 */
+function DateSunlight({ building }: { building: number }) {
+  const date = useApp((s) => s.date);
+  const sunlight = useApp((s) => s.sunlight);
+  const mine = sunlight?.building === building ? sunlight : null;
+  const n = mine?.minutes.length ?? 0;
+  const done = mine?.done ?? 0;
+  const stats = useMemo(() => {
+    if (!mine || done < n || n === 0) return null;
+    const sorted = Array.from(mine.minutes).sort((a, b) => a - b);
+    return {
+      min: sorted[0] as number,
+      median: sorted[Math.floor(n / 2)] as number,
+      max: sorted[n - 1] as number,
+    };
+  }, [mine, done, n]);
+  const t = dayTimes(date);
+  return (
+    <section>
+      <div className="label">{formatDate(date)} 日照</div>
+      {stats ? (
+        <div className="sun-stats">
+          <div>
+            <small>最少</small>
+            <b>{formatDuration(stats.min)}</b>
+          </div>
+          <div>
+            <small>中位</small>
+            <b>{formatDuration(stats.median)}</b>
+          </div>
+          <div>
+            <small>最多</small>
+            <b>{formatDuration(stats.max)}</b>
+          </div>
+        </div>
+      ) : (
+        <p className="sub mono">{n ? `${done} / ${n}` : '…'}</p>
+      )}
+      <SunRamp warmSpan={warmSpanFor(t.sunset - t.sunrise)} />
+    </section>
+  );
+}
+
 function WindowDetail({ data, index }: { data: SceneData; index: number }) {
   const date = useApp((s) => s.date);
+  const minute = useApp((s) => s.minute);
   const setFocus = useApp((s) => s.setFocusBuilding);
+  const select = useApp((s) => s.select);
   const d = data.district;
   const b = d.buildings[data.grid.building[index] as number] as Building;
   const floor = (data.grid.floor[index] as number) + 1;
@@ -106,6 +168,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
           .join(' · ')}
         title={title}
         sub={`${windowOrientation(data.grid, index)} · ${floor} 层 / 共 ${floorsOf(b.height)} 层`}
+        back={() => select({ kind: 'building', index: b.index })}
       />
 
       <section>
@@ -114,7 +177,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
           <>
             <div className="big-number">{formatDuration(result.minutes)}</div>
             <Verdict minutes={data.dahanMinutes[index] as number} />
-            <Timeline spans={result.spans} path={result.path} onFocus={setFocus} />
+            <Timeline spans={result.spans} path={result.path} now={minute} onFocus={setFocus} />
           </>
         ) : (
           <div className="big-number muted">…</div>
@@ -173,6 +236,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
         title={title}
         sub={heightNote(b)}
       />
+      {count > 0 && <DateSunlight building={index} />}
       {count > 0 && (
         <section>
           <div className="label">大寒日不足 2 小时的窗位</div>

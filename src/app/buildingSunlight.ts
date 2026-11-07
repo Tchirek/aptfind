@@ -1,5 +1,5 @@
 /**
- * 选中那栋楼在所选日期的逐窗日照（日出到日落）：在主线程分帧计算，每帧最多占 8 ms，
+ * 选中那栋楼在所选日期的逐窗日照（日出到日落）：在主线程分片计算，每片最多占 8 ms 后让出，
  * 从底层往上一层层算，界面上看到的是外墙由下而上逐层着色。
  * 同一栋楼、同一天的结果缓存起来，来回切换不重算。
  */
@@ -54,7 +54,7 @@ export function SunlightController({ data }: { data: SceneData }): null {
       (a, b) => (data.grid.floor[start + a] as number) - (data.grid.floor[start + b] as number),
     );
     let alive = true;
-    let raf = 0;
+    let timer = 0;
     let next = 0;
     getEngine().then((engine) => {
       if (!alive) return;
@@ -69,17 +69,18 @@ export function SunlightController({ data }: { data: SceneData }): null {
         }
         setState({ building, start, minutes, done: next });
         if (next < n) {
-          raf = requestAnimationFrame(tick);
+          // 用定时器而不是 requestAnimationFrame：页面在后台时也能算完
+          timer = window.setTimeout(tick, 0);
         } else {
           cache.set(key, minutes);
           if (cache.size > MAX_CACHE) cache.delete(cache.keys().next().value as string);
         }
       };
-      raf = requestAnimationFrame(tick);
+      timer = window.setTimeout(tick, 0);
     });
     return () => {
       alive = false;
-      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
     };
   }, [data, building, iso, setState]);
 

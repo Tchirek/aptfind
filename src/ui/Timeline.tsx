@@ -32,10 +32,13 @@ function mergeSpans(spans: Span[]): MergedSpan[] {
 export function Timeline({
   spans,
   path,
+  now,
   onFocus,
 }: {
   spans: Span[];
   path: SunPath;
+  /** 场景当前时刻（北京时间分钟），落在这一天的日照时段内时画一道竖线 */
+  now?: number;
   onFocus: (building: number | null) => void;
 }) {
   const { startTst, endTst } = path.day;
@@ -79,6 +82,9 @@ export function Timeline({
             </rect>
           );
         })}
+        {now !== undefined && now >= bjStart && now <= bjEnd && (
+          <line className="now" x1={xBj(now)} x2={xBj(now)} y1={-2} y2={H + 2} />
+        )}
       </svg>
       <figcaption>
         <span>
