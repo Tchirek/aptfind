@@ -18,7 +18,7 @@ export const buildingUniforms = {
   uHover: { value: -1 },
   uFocus: { value: -1 },
   uGlass: { value: new Color('#4d5b69') },
-  uFocusColor: { value: new Color('#4a4740') },
+  uFocusColor: { value: new Color('#2f4562') },
 };
 
 const vertexHead = /* glsl */ `

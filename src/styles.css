@@ -1,10 +1,10 @@
 :root {
-  --surface: #f3f2ee;
-  --panel: #fbfaf8;
-  --line: #dad6ce;
-  --ink: #1f1f1c;
-  --ink-2: #57544e;
-  --ink-3: #8a867e;
+  --surface: #ffffff;
+  --panel: #ffffff;
+  --line: #d5dde8;
+  --ink: #0f1e33;
+  --ink-2: #3e5470;
+  --ink-3: #7a8ca3;
   --good: #0f7a0f;
   --bad: #b8322f;
   --radius: 6px;
@@ -216,7 +216,7 @@ button {
   border-radius: 4px;
 }
 .close:hover {
-  background: #efede8;
+  background: #eef3f9;
   color: var(--ink);
 }
 
@@ -259,11 +259,11 @@ button {
   display: flex;
   gap: 10px;
   padding: 6px 4px;
-  border-top: 1px solid #ebe8e2;
+  border-top: 1px solid #e6ecf3;
   cursor: default;
 }
 .blockers li:hover {
-  background: #f1efea;
+  background: #f1f5fa;
 }
 .blockers .mono {
   color: var(--ink-2);
@@ -303,7 +303,7 @@ button {
   width: 96px;
   height: 6px;
   border-radius: 3px;
-  background: #e6e3dc;
+  background: #e2e9f2;
   overflow: hidden;
 }
 .meter i {
@@ -317,7 +317,7 @@ button {
   padding: 0;
 }
 .access li + li {
-  border-top: 1px solid #ebe8e2;
+  border-top: 1px solid #e6ecf3;
 }
 .access button {
   width: 100%;
@@ -333,14 +333,14 @@ button {
   border-radius: 4px;
 }
 .access button:hover:not(:disabled) {
-  background: #f1efea;
+  background: #f1f5fa;
 }
 .access button:disabled {
   cursor: default;
   color: var(--ink-3);
 }
 .access li.on button {
-  background: #ece9e2;
+  background: #e9eff6;
 }
 .access-kind {
   color: var(--ink-3);
@@ -382,7 +382,7 @@ button {
   color: var(--ink-2);
 }
 .attribution-btn:hover {
-  background: #efede8;
+  background: #eef3f9;
 }
 .attribution-panel {
   position: static;
@@ -404,9 +404,9 @@ button {
   pointer-events: none;
   user-select: none;
   text-shadow:
-    0 0 2px #f3f2ee,
-    0 0 2px #f3f2ee,
-    0 0 3px #f3f2ee;
+    0 0 2px #ffffff,
+    0 0 2px #ffffff,
+    0 0 3px #ffffff;
 }
 .map-label.strong {
   font-size: 12px;
@@ -533,7 +533,7 @@ button {
   white-space: nowrap;
   padding: 3px 8px;
   border-radius: 4px;
-  background: rgba(31, 31, 28, 0.88);
+  background: rgba(15, 30, 51, 0.88);
   color: #fff;
   font-size: 12px;
   transform: translateY(-16px);
@@ -543,7 +543,7 @@ button {
   font-weight: 600;
 }
 .window-tip span {
-  color: #d9d5cc;
+  color: #d6dee9;
 }
 
 /* 选中楼的日照概况 */
@@ -651,7 +651,7 @@ button {
 .liv-bar {
   height: 6px;
   border-radius: 3px;
-  background: #e6e3dc;
+  background: #e2e9f2;
   overflow: hidden;
 }
 .liv-bar i {
@@ -677,7 +677,7 @@ button {
   list-style: none;
   margin: 10px 0 0;
   padding: 8px 0 0;
-  border-top: 1px solid #ebe8e2;
+  border-top: 1px solid #e6ecf3;
   display: grid;
   gap: 4px;
   font-size: 12px;
@@ -741,7 +741,7 @@ button {
   width: 100%;
   min-height: 2px;
   border-radius: 2px 2px 0 0;
-  background: #dcd8cf;
+  background: #d3dce8;
 }
 .price-scale li.on .price-bar i {
   background: var(--ink-2);

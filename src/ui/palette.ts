@@ -45,5 +45,5 @@ export function rampColor(minutes: number, warmSpan = WARM_SPAN): string {
 /** 时间轴上的状态色 */
 export const SPAN_COLOR = {
   lit: '#efbb55',
-  unlit: '#cfcac0',
+  unlit: '#c9d3e0',
 } as const;

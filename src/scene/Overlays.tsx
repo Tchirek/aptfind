@@ -4,7 +4,7 @@ import type { SceneData } from '../app/data';
 import { useApp } from '../app/store';
 import { type District, terrainAt } from '../engine/district';
 
-const INK = '#1f1f1c';
+const INK = '#0f1e33';
 
 /** 把平面折线贴到地形上：逐段加密到 4 m 以内，抬高 lift 米 */
 function drape(

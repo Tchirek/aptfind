@@ -6,10 +6,10 @@ import { terrainAt } from '../engine/district';
 import './search.css';
 
 const DOT_COLOR: Record<SearchEntry['kind'], string> = {
-  compound: '#1f1f1c',
-  building: '#57544e',
-  poi: '#8a867e',
-  road: '#b9b4aa',
+  compound: '#0f1e33',
+  building: '#3e5470',
+  poi: '#7a8ca3',
+  road: '#a9b7c9',
 };
 
 export function SearchBox({ data }: { data: SceneData }) {

@@ -12,13 +12,13 @@ import {
 import type { District } from '../engine/district';
 import type { Region } from '../engine/region';
 
-export const GROUND = '#e9e7e1';
-const ROAD_MAJOR = '#d3cfc5';
-const ROAD_MINOR = '#dedad1';
+export const GROUND = '#eef1f5';
+const ROAD_MAJOR = '#cfd7e2';
+const ROAD_MINOR = '#dce3ec';
 const WATER = '#bfccd3';
-const RESIDENTIAL_FILL = 'rgba(214, 205, 186, 0.22)';
+const RESIDENTIAL_FILL = 'rgba(186, 200, 220, 0.22)';
 const SCHOOL_FILL = 'rgba(201, 211, 190, 0.32)';
-const BOUNDARY = 'rgba(120, 112, 98, 0.38)';
+const BOUNDARY = 'rgba(90, 108, 135, 0.38)';
 const CAMPUS_BOUNDARY = 'rgba(70, 92, 66, 0.6)';
 
 /** 各级道路的路面宽度（米） */
@@ -138,8 +138,8 @@ export function buildGroundTexture(d: District, size = 4096): GroundTextures {
   // 楼脚的接地阴影：轮廓向外晕开几米，与外墙墙脚压暗接上
   ctx.save();
   ctx.globalCompositeOperation = 'multiply';
-  ctx.fillStyle = 'rgb(205, 200, 190)';
-  ctx.shadowColor = 'rgba(60, 52, 40, 0.38)';
+  ctx.fillStyle = 'rgb(196, 205, 218)';
+  ctx.shadowColor = 'rgba(40, 52, 70, 0.38)';
   ctx.shadowBlur = 5 * sx;
   for (const b of d.buildings) {
     const outer = b.rings[0];

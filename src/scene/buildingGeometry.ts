@@ -24,14 +24,14 @@ const STYLE: Record<BuildingClass, number> = {
   I: 3,
 };
 
-/** 外墙涂料与面砖的常见色，按功能分组，低彩度 */
+/** 外墙色：冷调的白与浅灰蓝，按功能分组，低彩度 */
 const WALL_COLORS: Record<number, string[]> = {
-  0: ['#eeeae2', '#e6e1d6', '#f1efea', '#e5ddd0', '#ebe5db', '#e0dbd2', '#efe7d9', '#e3e3df'],
-  1: ['#e8e1d6', '#e0d6c8', '#ecebe6', '#dcd2c4'],
+  0: ['#eef1f5', '#e4e9f0', '#f3f5f8', '#dfe5ed', '#e9edf3', '#dde3eb', '#edf0f4', '#e3e6ea'],
+  1: ['#e5eaf1', '#dbe2eb', '#ebeef2', '#d6dde8'],
   2: ['#d8dde1', '#cfd6dc', '#e0e2e2'],
-  3: ['#dedcd6', '#d5d3cc'],
+  3: ['#dde1e7', '#d3d8df'],
 };
-const ROOF_TINT = new Color('#bebab2');
+const ROOF_TINT = new Color('#b4bdc9');
 
 /** 可复现的伪随机：同一栋楼每次加载颜色相同 */
 function rand(seed: number): number {

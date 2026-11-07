@@ -8,7 +8,7 @@ import { buildSolids } from '../engine/geometry';
 import { buildBuildingGeometry } from './buildingGeometry';
 import { buildingUniforms, createBuildingMaterial } from './buildingMaterial';
 
-const OUTLINE_COLOR = '#1f1f1c';
+const OUTLINE_COLOR = '#0f1e33';
 
 /** 轮廓顶点的平均值，作为镜头对准的点 */
 export function centroid(ring: Float64Array): [number, number] {

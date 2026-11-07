@@ -330,10 +330,10 @@ export function Labels({ district }: { district: District }) {
 
     const placed: Box[] = [];
     const free = (b: Box) => !placed.some((p) => overlaps(p, b));
-    const ink = night ? '#e8e4dc' : '#57544e';
-    const inkStrong = night ? '#ffffff' : '#1f1f1c';
-    const halo = night ? 'rgba(14, 18, 28, 0.85)' : 'rgba(243, 242, 238, 0.92)';
-    const roadInk = night ? '#c9c4ba' : '#7a756b';
+    const ink = night ? '#e3eaf3' : '#3e5470';
+    const inkStrong = night ? '#ffffff' : '#0f1e33';
+    const halo = night ? 'rgba(14, 18, 28, 0.85)' : 'rgba(255, 255, 255, 0.92)';
+    const roadInk = night ? '#bcc8d8' : '#66788f';
 
     type Item = { priority: number; d: number; draw: () => void };
     const items: Item[] = [];
@@ -378,11 +378,11 @@ export function Labels({ district }: { district: District }) {
           placed.push(box);
           ctx.font = font;
           if (p.style === 'station') {
-            ctx.fillStyle = night ? 'rgba(255,255,255,0.92)' : 'rgba(31,31,28,0.86)';
+            ctx.fillStyle = night ? 'rgba(255,255,255,0.92)' : 'rgba(15,30,51,0.86)';
             ctx.beginPath();
             ctx.roundRect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0, 3);
             ctx.fill();
-            ctx.fillStyle = night ? '#1f1f1c' : '#ffffff';
+            ctx.fillStyle = night ? '#0f1e33' : '#ffffff';
             ctx.fillText(p.text, s[0], s[1] + 0.5);
             return;
           }
