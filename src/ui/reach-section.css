@@ -1,0 +1,88 @@
+.reach-loading {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.reach-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reach-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.reach-swatch {
+  flex-shrink: 0;
+  width: 16px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+.reach-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.reach-area {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.reach-stations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  list-style: none;
+  padding: 0;
+}
+
+.reach-station-tag {
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.reach-toggle {
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 2px 6px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reach-toggle:hover {
+  text-decoration: underline;
+}
+
+.reach-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.reach-text-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.reach-text-btn:hover {
+  text-decoration: underline;
+}
