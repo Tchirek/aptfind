@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getEngine, type SceneData } from '../app/data';
 import { formatClock, formatDuration, windowOrientation } from '../app/format';
+import { usePhoto } from '../app/photos';
 import { buildingTitle } from '../app/search';
 import { useApp } from '../app/store';
 import { daylightSpec, dayTimes, formatDate } from '../app/time';
@@ -12,8 +13,10 @@ import { LandPriceSection } from './LandPriceSection';
 import { LivabilitySection } from './LivabilitySection';
 import { THRESHOLD_MINUTES, warmSpanFor } from './palette';
 import { ReachSection } from './ReachSection';
+import { Frame, Sheet } from './Sheet';
 import { SunRamp } from './SunRamp';
 import { Timeline } from './Timeline';
+import { SHEET_QUERY, useMedia } from './useMedia';
 import { ViewSection } from './ViewSection';
 
 function heightNote(b: Building): string {
@@ -60,15 +63,19 @@ function Head({
   title,
   sub,
   back,
+  photo,
 }: {
   eyebrow: string;
   title: string;
   sub?: string;
   /** 从窗位回到整栋楼 */
   back?: () => void;
+  /** 题图按这些地块名依次找 */
+  photo?: string[];
 }) {
   return (
     <header className="inspector-head">
+      <HeadPhoto names={photo ?? []} />
       {back && (
         <button type="button" className="back" onClick={back}>
           ‹ 整栋楼
@@ -79,6 +86,38 @@ function Head({
       {sub && <p className="sub">{sub}</p>}
     </header>
   );
+}
+
+/** 题图：无边框，铺满面板宽度；载入完成才淡入，载不到就不占位置 */
+function HeadPhoto({ names }: { names: string[] }) {
+  const photo = usePhoto(names);
+  const [loaded, setLoaded] = useState<string | null>(null);
+  if (!photo) return null;
+  return (
+    <img
+      className={`head-photo${loaded === photo.url ? ' in' : ''}`}
+      src={photo.url}
+      alt={photo.name}
+      ref={(el) => {
+        // 缓存里的图可能在挂上 onLoad 之前就已载完
+        if (el?.complete && el.naturalWidth > 0 && loaded !== photo.url) setLoaded(photo.url);
+      }}
+      onLoad={() => setLoaded(photo.url)}
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+      }}
+      referrerPolicy="no-referrer"
+      draggable={false}
+    />
+  );
+}
+
+/** 一栋楼的题图跟着它所属的地块；地块没有图就用上级（如校内的苑区用校园的） */
+function photoNames(d: District, compound: number): string[] {
+  const c = d.compounds[compound];
+  if (!c) return [];
+  const parent = c.parent >= 0 ? d.compounds[c.parent] : undefined;
+  return parent ? [c.name, parent.name] : [c.name];
 }
 
 /** 选中楼在所选日期的日照概况：边算边显示进度，算完给出最少、中位、最多，附外墙色带 */
@@ -164,16 +203,19 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
   );
 
   return (
-    <>
-      <Head
-        eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
-          .filter(Boolean)
-          .join(' · ')}
-        title={title}
-        sub={`${windowOrientation(data.grid, index)} · ${floor} 层 / 共 ${floorsOf(b.height)} 层`}
-        back={() => select({ kind: 'building', index: b.index })}
-      />
-
+    <Frame
+      head={
+        <Head
+          eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
+            .filter(Boolean)
+            .join(' · ')}
+          title={title}
+          sub={`${windowOrientation(data.grid, index)} · ${floor} 层 / 共 ${floorsOf(b.height)} 层`}
+          back={() => select({ kind: 'building', index: b.index })}
+          photo={photoNames(d, b.compound)}
+        />
+      }
+    >
       <section>
         <div className="label">{formatDate(date)} 日照</div>
         {result ? (
@@ -221,7 +263,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
       <section className="note">
         <p>{heightNote(b)}</p>
       </section>
-    </>
+    </Frame>
   );
 }
 
@@ -233,14 +275,18 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
   const { below, count } = shortfall(data, [index]);
 
   return (
-    <>
-      <Head
-        eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
-          .filter(Boolean)
-          .join(' · ')}
-        title={title}
-        sub={heightNote(b)}
-      />
+    <Frame
+      head={
+        <Head
+          eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
+            .filter(Boolean)
+            .join(' · ')}
+          title={title}
+          sub={heightNote(b)}
+          photo={photoNames(d, b.compound)}
+        />
+      }
+    >
       {count > 0 && <DateSunlight building={index} />}
       {count > 0 && (
         <section>
@@ -258,7 +304,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
       <LandPriceSection />
       <ReachSection building={index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
-    </>
+    </Frame>
   );
 }
 
@@ -279,14 +325,18 @@ function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
   const parent = c.parent >= 0 ? d.compounds[c.parent] : undefined;
 
   return (
-    <>
-      <Head
-        eyebrow={[KIND_LABEL[c.kind], parent?.name, c.builtYear ? `${c.builtYear} 年建成` : '']
-          .filter(Boolean)
-          .join(' · ')}
-        title={c.name}
-        sub={`${members.length} 栋`}
-      />
+    <Frame
+      head={
+        <Head
+          eyebrow={[KIND_LABEL[c.kind], parent?.name, c.builtYear ? `${c.builtYear} 年建成` : '']
+            .filter(Boolean)
+            .join(' · ')}
+          title={c.name}
+          sub={`${members.length} 栋`}
+          photo={photoNames(d, index)}
+        />
+      }
+    >
       {count > 0 && (
         <section>
           <div className="label">大寒日不足 2 小时的窗位</div>
@@ -301,22 +351,35 @@ function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
       )}
       <AccessSection ring={largest} />
       <LandPriceSection />
-    </>
+    </Frame>
   );
 }
 
 export function Inspector({ data }: { data: SceneData }) {
   const selection = useApp((s) => s.selection);
   const select = useApp((s) => s.select);
+  const sheet = useMedia(SHEET_QUERY);
   if (!selection) return null;
+  const detail = (
+    <>
+      {selection.kind === 'window' && <WindowDetail data={data} index={selection.index} />}
+      {selection.kind === 'building' && <BuildingDetail data={data} index={selection.index} />}
+      {selection.kind === 'compound' && <CompoundDetail data={data} index={selection.index} />}
+    </>
+  );
+  if (sheet) {
+    return (
+      <Sheet onClose={() => select(null)} openKey={`${selection.kind}:${selection.index}`}>
+        {detail}
+      </Sheet>
+    );
+  }
   return (
     <aside className="panel inspector">
       <button type="button" className="close" onClick={() => select(null)} aria-label="关闭">
         ×
       </button>
-      {selection.kind === 'window' && <WindowDetail data={data} index={selection.index} />}
-      {selection.kind === 'building' && <BuildingDetail data={data} index={selection.index} />}
-      {selection.kind === 'compound' && <CompoundDetail data={data} index={selection.index} />}
+      {detail}
     </aside>
   );
 }

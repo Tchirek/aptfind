@@ -136,7 +136,8 @@ button {
   overflow: auto;
   padding: 16px 18px 18px;
 }
-.inspector section {
+.inspector section,
+.sheet-body section {
   margin-top: 16px;
 }
 .inspector-head h2 {
@@ -322,7 +323,7 @@ button {
 .access button {
   width: 100%;
   display: grid;
-  grid-template-columns: 60px 1fr auto;
+  grid-template-columns: 76px 1fr auto;
   gap: 8px;
   align-items: baseline;
   padding: 6px 4px;
@@ -364,37 +365,6 @@ button {
   color: var(--ink-2);
 }
 
-.attribution-wrap {
-  position: absolute;
-  right: 24px;
-  bottom: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-.attribution-btn {
-  border: 1px solid var(--line);
-  background: var(--panel);
-  border-radius: var(--radius);
-  padding: 4px 10px;
-  font-size: 11px;
-  color: var(--ink-2);
-}
-.attribution-btn:hover {
-  background: #eef3f9;
-}
-.attribution-panel {
-  position: static;
-  padding: 8px 12px;
-  font-size: 11px;
-  color: var(--ink-2);
-  max-width: 280px;
-}
-.attribution-panel div + div {
-  margin-top: 4px;
-}
-
 /* 地图标注 */
 .map-label {
   font-size: 11px;
@@ -430,33 +400,8 @@ button {
   font-size: 10px;
 }
 
-.splash {
-  height: 100%;
-  display: grid;
-  place-content: center;
-  text-align: center;
-}
-.splash h1 {
-  margin: 0;
-  font-size: 40px;
-  letter-spacing: 0.12em;
-}
-.splash p {
-  color: var(--ink-2);
-  font-size: 14px;
-}
-
 /* 手机：搜索占满顶部，详情是停靠在时间栏上方的底部面板 */
 @media (max-width: 720px) {
-  .attribution-wrap {
-    left: 8px;
-    right: auto;
-    align-items: flex-start;
-    bottom: calc(var(--timebar-h, 120px) + 20px + env(safe-area-inset-bottom));
-  }
-  .attribution-panel {
-    max-width: min(280px, calc(100vw - 16px));
-  }
   .inspector {
     top: auto;
     left: 8px;
@@ -493,7 +438,7 @@ button {
     padding: 4px 6px;
   }
   .liv-dims li {
-    grid-template-columns: 54px 1fr 40px;
+    grid-template-columns: 70px 1fr 40px;
   }
 }
 
@@ -520,9 +465,6 @@ button {
     right: 8px;
     width: auto;
   }
-  .attribution-wrap {
-    display: none;
-  }
 }
 
 /* 悬停窗位的标签 */
@@ -544,6 +486,11 @@ button {
 }
 .window-tip span {
   color: #d6dee9;
+}
+.window-tip i {
+  font-style: normal;
+  font-size: 11px;
+  color: #9fd8ff;
 }
 
 /* 选中楼的日照概况 */
@@ -640,7 +587,7 @@ button {
 }
 .liv-dims li {
   display: grid;
-  grid-template-columns: 58px 1fr 42px;
+  grid-template-columns: 72px 1fr 42px;
   align-items: center;
   gap: 3px 8px;
   font-size: 13px;
@@ -761,4 +708,46 @@ button {
   font-size: 11px;
   line-height: 1.5;
   color: var(--ink-3);
+}
+
+/* 题图：标题上方，无边框，铺满面板宽度 */
+.head-photo {
+  display: block;
+  width: calc(100% + 36px);
+  max-width: none;
+  margin: -16px -18px 14px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #eef3f9;
+  border-radius: var(--radius) var(--radius) 0 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  user-select: none;
+}
+.head-photo.in {
+  opacity: 1;
+}
+/* 关闭键压在题图上也看得清 */
+.inspector .close {
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 50%;
+}
+.sheet .head-photo {
+  width: calc(100% + 70px);
+  margin: 0 -52px 12px -18px;
+  border-radius: 0;
+  max-height: 0;
+  aspect-ratio: auto;
+  transition:
+    max-height 0.36s cubic-bezier(0.22, 0.9, 0.3, 1),
+    opacity 0.4s ease;
+}
+.sheet.full .head-photo {
+  max-height: 210px;
+  height: 210px;
+}
+.sheet:not(.full) .head-photo {
+  margin-bottom: 0;
+  opacity: 0;
 }

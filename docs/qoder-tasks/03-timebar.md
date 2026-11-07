@@ -15,17 +15,17 @@
 
 `src/app/store.ts` 的 `useApp`：
 
-| 字段 | 含义 |
-| --- | --- |
-| `date: CivilDate` | 场景日期 `{ year, month, day }`，北京时间 |
-| `minute: number` | 北京时间当日第几分钟，0–1440，可带小数 |
-| `live: boolean` | 是否跟随现在 |
-| `playing: boolean` | 是否在播放 |
-| `setDate(date)` | 换日期，同时退出跟随 |
-| `setMinute(m)` | 改时刻，同时退出跟随 |
-| `goLive()` | 回到现在并开始跟随，停止播放 |
-| `syncNow()` | 跟随现在时同步到当前时刻（不跟随时什么也不做） |
-| `setPlaying(p)` | 开始/停止播放；开始播放会退出跟随 |
+| 字段               | 含义                                           |
+| ------------------ | ---------------------------------------------- |
+| `date: CivilDate`  | 场景日期 `{ year, month, day }`，北京时间      |
+| `minute: number`   | 北京时间当日第几分钟，0–1440，可带小数         |
+| `live: boolean`    | 是否跟随现在                                   |
+| `playing: boolean` | 是否在播放                                     |
+| `setDate(date)`    | 换日期，同时退出跟随                           |
+| `setMinute(m)`     | 改时刻，同时退出跟随                           |
+| `goLive()`         | 回到现在并开始跟随，停止播放                   |
+| `syncNow()`        | 跟随现在时同步到当前时刻（不跟随时什么也不做） |
+| `setPlaying(p)`    | 开始/停止播放；开始播放会退出跟随              |
 
 注意：zustand v5 里**一个选择器只取一个字段或一个函数**，例如 `useApp((s) => s.minute)`。
 不要写 `useApp((s) => ({ a: s.a, b: s.b }))`，那样每次返回新对象会无限重渲染。
