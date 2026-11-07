@@ -1,6 +1,7 @@
 # 数据管线
 
-把原始数据处理成前端直接加载的 `public/data/district.json`。原始数据不进仓库。
+把原始数据处理成前端直接加载的 `public/data/district.json`（片区：建筑、地形、地名、道路、设施）
+与 `public/data/region.json`（区域：地铁网、步行网、远景底图）。原始数据不进仓库。
 
 ## 准备
 
@@ -36,7 +37,8 @@ VITE_AMAP_SECURITY_CODE=...
 这类 Key 只能在浏览器里调用，所以采集在本地开发服务器上进行：
 
 1. 先运行一次 `build_district.py`，生成 `pipeline/raw/amap/input-points.json`（核心区每栋楼的坐标）；
-2. `npm run dev`，打开 `/tools/amap.html`，在控制台依次执行 `await jgCollect.regeo()`、`await jgCollect.pois()`、`await jgCollect.campusNames()`；
+2. `npm run dev`，打开 `/tools/amap.html`，在控制台依次执行 `await jgCollect.regeo()`、`await jgCollect.roads()`、`await jgCollect.pois()`、`await jgCollect.campusNames()`；
+   `roads()` 读 `road-points.json`（OSM 里没有名字的道路沿线样点），取附近道路名，供管线投票补名；
 3. 结果落盘到 `pipeline/raw/amap/`，再运行一次 `build_district.py`。
 
 单栋楼的名称可以在 `names.csv` 里手工覆盖（`names_todo.csv` 按面积列出了校园里还没有名字的楼，带坐标与层数）；
@@ -44,6 +46,20 @@ VITE_AMAP_SECURITY_CODE=...
 
 脚本会打印 CBMF 与 OSM 建筑质心的偏移中位数，用来确认两套数据没有坐标系错位。
 当前数据：1430 栋匹配，偏移 dx 0.79 m、dy 2.36 m，没有 GCJ-02 那种上百米的偏移。
+
+## 区域数据（可达范围用）
+
+选中一栋楼时画"15 分钟步行"与"30 分钟步行 + 地铁"的可达范围，需要片区以外的地铁网与步行网：
+
+```bash
+pipeline/.venv/Scripts/python pipeline/fetch_region.py metro          # 地铁线路关系、车站、出入口
+pipeline/.venv/Scripts/python pipeline/build_region.py --candidates   # 30 分钟内可能到达的车站与取数范围
+pipeline/.venv/Scripts/python pipeline/fetch_region.py walk basemap   # 片区外扩 2.6 km + 各候选车站周边的步行网、远景底图
+pipeline/.venv/Scripts/python pipeline/build_region.py                # 写出 public/data/region.json
+```
+
+出行参数（进站候车 5 分、换乘 5 分、出站 2 分、步速 75 m/min、普线 520 m/min）写在 `build_region.py` 顶部，
+随 region.json 一起交给前端。`npx tsx scripts/bench-isochrone.ts <楼名>` 可以用真实数据跑一遍看耗时与结果。
 
 ## 楼高实地核验
 
