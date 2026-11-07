@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getEngine, type SceneData } from '../app/data';
-import { formatClock, formatDuration, windowOrientation } from '../app/format';
+import { builtLabel, formatClock, formatDuration, windowOrientation } from '../app/format';
 import { usePhoto } from '../app/photos';
 import { buildingTitle } from '../app/search';
 import { useApp } from '../app/store';
@@ -78,7 +78,7 @@ function Head({
       <HeadPhoto names={photo ?? []} />
       {back && (
         <button type="button" className="back" onClick={back}>
-          ‹ 整栋楼
+          ‹ 返回
         </button>
       )}
       <div className="eyebrow">{eyebrow}</div>
@@ -206,7 +206,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
     <Frame
       head={
         <Head
-          eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
+          eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? builtLabel(year) : '']
             .filter(Boolean)
             .join(' · ')}
           title={title}
@@ -278,7 +278,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
     <Frame
       head={
         <Head
-          eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? `${year} 年建成` : '']
+          eyebrow={[CLASS_LABEL[b.cls], subtitle, year ? builtLabel(year) : '']
             .filter(Boolean)
             .join(' · ')}
           title={title}
@@ -300,7 +300,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
           </p>
         </section>
       )}
-      <LivabilitySection building={index} />
+      <LivabilitySection building={index} roof={(data.roofScores[index] ?? -1) >= 0} />
       <LandPriceSection />
       <ReachSection building={index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
@@ -328,7 +328,7 @@ function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
     <Frame
       head={
         <Head
-          eyebrow={[KIND_LABEL[c.kind], parent?.name, c.builtYear ? `${c.builtYear} 年建成` : '']
+          eyebrow={[KIND_LABEL[c.kind], parent?.name, c.builtYear ? builtLabel(c.builtYear) : '']
             .filter(Boolean)
             .join(' · ')}
           title={c.name}

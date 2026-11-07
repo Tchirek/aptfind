@@ -36,3 +36,8 @@ export function formatOrientation(azimuth: number): string {
 export function windowOrientation(grid: WindowGrid, i: number): string {
   return formatOrientation(wallAzimuth(grid, i));
 }
+
+/** "2015 年建成"；还没交付的写"预计 2027 年交付" */
+export function builtLabel(year: number, now = new Date().getFullYear()): string {
+  return year > now ? `预计 ${year} 年交付` : `${year} 年建成`;
+}

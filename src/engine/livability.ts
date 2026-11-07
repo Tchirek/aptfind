@@ -254,7 +254,10 @@ function ageDimension(facts: LivabilityFacts): Dimension {
     label: '楼龄',
     score,
     max: MAX.age,
-    detail: `${facts.builtYear} 年建成 · ${age} 年`,
+    detail:
+      facts.builtYear > CURRENT_YEAR
+        ? `预计 ${facts.builtYear} 年交付`
+        : `${facts.builtYear} 年建成 · ${age} 年`,
   };
 }
 
