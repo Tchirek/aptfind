@@ -1,7 +1,8 @@
 /**
  * 步行可达：在 OSM 步行网上跑 Dijkstra，给出到各类设施的步行距离与路线。
  *
- * 起点、终点各自吸附到最近的路网节点，吸附段按直线距离计入。
+ * 起点是一栋楼：沿外轮廓每隔几米取一个"门"，各自吸附到最近的路网节点，作为多源最短路的起点；
+ * 终点（设施）吸附到最近节点。吸附段按直线距离计入。
  * 步速取 75 m/min（4.5 km/h），台阶按 1.6 倍距离计。
  */
 
@@ -14,7 +15,7 @@ const CELL = 80;
 
 export const minutesOf = (meters: number) => meters / WALK_SPEED;
 
-class MinHeap {
+export class MinHeap {
   private keys: number[] = [];
   private vals: number[] = [];
   get size() {
@@ -61,15 +62,24 @@ class MinHeap {
   }
 }
 
+/** 多源最短路的结果：prev 为 -1 的可达节点就是起点之一 */
 export interface ShortestPaths {
-  source: number;
   dist: Float64Array;
   prev: Int32Array;
+}
+
+/** 最短路的起点：路网节点与到达它时已经走过的距离（米） */
+export interface Seed {
+  node: number;
+  dist: number;
 }
 
 export class WalkGraph {
   readonly nodeCount: number;
   readonly xy: Float64Array;
+  /** 原始边表 [a0, b0, a1, b1, …] 与每条边的通行长度（台阶已加权），画可达范围时逐边使用 */
+  readonly edgeNodes: Uint32Array;
+  readonly edgeCost: Float32Array;
   private readonly offsets: Uint32Array;
   private readonly targets: Uint32Array;
   private readonly weights: Float32Array;
@@ -90,6 +100,8 @@ export class WalkGraph {
       this.offsets[i + 1] = (this.offsets[i] as number) + (degree[i] as number);
     this.targets = new Uint32Array(2 * m);
     this.weights = new Float32Array(2 * m);
+    this.edgeNodes = net.edges;
+    this.edgeCost = new Float32Array(m);
     const fill = this.offsets.slice(0, n);
     for (let e = 0; e < m; e++) {
       const a = net.edges[2 * e] as number;
@@ -97,6 +109,7 @@ export class WalkGraph {
       const len =
         Math.hypot(this.x(a) - this.x(b), this.y(a) - this.y(b)) *
         (net.steps.has(e) ? STEPS_FACTOR : 1);
+      this.edgeCost[e] = len;
       const ia = fill[a] as number;
       this.targets[ia] = b;
       this.weights[ia] = len;
@@ -152,11 +165,19 @@ export class WalkGraph {
 
   /** 从 source 出发的最短路，超过 maxDist 的节点不再展开 */
   shortest(source: number, maxDist = Number.POSITIVE_INFINITY): ShortestPaths {
+    return this.shortestFrom([{ node: source, dist: 0 }], maxDist);
+  }
+
+  /** 多源最短路：每个起点带着初始距离出发，超过 maxDist 的节点不再展开 */
+  shortestFrom(seeds: readonly Seed[], maxDist = Number.POSITIVE_INFINITY): ShortestPaths {
     const dist = new Float64Array(this.nodeCount).fill(Number.POSITIVE_INFINITY);
     const prev = new Int32Array(this.nodeCount).fill(-1);
     const heap = new MinHeap();
-    dist[source] = 0;
-    heap.push(0, source);
+    for (const s of seeds) {
+      if (s.node < 0 || s.dist >= (dist[s.node] as number)) continue;
+      dist[s.node] = s.dist;
+      heap.push(s.dist, s.node);
+    }
     while (heap.size) {
       const [d, u] = heap.pop();
       if (d > (dist[u] as number) || d > maxDist) continue;
@@ -179,17 +200,20 @@ export class WalkGraph {
         }
       }
     }
-    return { source, dist, prev };
+    return { dist, prev };
+  }
+
+  /** 沿最短路树从 target 回溯到起点：返回节点序列（起点在前） */
+  pathTo(sp: ShortestPaths, target: number): number[] {
+    const nodes: number[] = [];
+    if (!Number.isFinite(sp.dist[target] as number)) return nodes;
+    for (let v = target; v >= 0; v = sp.prev[v] as number) nodes.push(v);
+    return nodes.reverse();
   }
 
   /** 从起点到 target 的折线 [x0, y0, x1, y1, …] */
   route(sp: ShortestPaths, target: number): Float64Array {
-    const nodes: number[] = [];
-    for (let v = target; v >= 0; v = sp.prev[v] as number) {
-      nodes.push(v);
-      if (v === sp.source) break;
-    }
-    nodes.reverse();
+    const nodes = this.pathTo(sp, target);
     const out = new Float64Array(nodes.length * 2);
     nodes.forEach((v, k) => {
       out[2 * k] = this.x(v);
@@ -197,6 +221,41 @@ export class WalkGraph {
     });
     return out;
   }
+}
+
+/** 楼的出入口：外轮廓上的点，吸附到某个路网节点 */
+export interface Door extends Seed {
+  x: number;
+  y: number;
+}
+
+/**
+ * 沿楼的外轮廓每隔 spacing 米取一个点作为出入口，各自吸附到最近的路网节点；
+ * 同一节点只留最近的那个点。没有路网数据时（比如离路太远）返回空表。
+ */
+export function buildingDoors(
+  graph: WalkGraph,
+  outer: Float64Array,
+  spacing = 8,
+  maxSnap = 150,
+): Door[] {
+  const best = new Map<number, Door>();
+  const n = outer.length / 2;
+  const offer = (x: number, y: number) => {
+    const { node, distance } = graph.nearest(x, y);
+    if (node < 0 || distance > maxSnap) return;
+    const prev = best.get(node);
+    if (!prev || distance < prev.dist) best.set(node, { node, dist: distance, x, y });
+  };
+  for (let i = 0; i < n; i++) {
+    const ax = outer[2 * i] as number;
+    const ay = outer[2 * i + 1] as number;
+    const bx = outer[2 * ((i + 1) % n)] as number;
+    const by = outer[2 * ((i + 1) % n) + 1] as number;
+    const k = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / spacing));
+    for (let j = 0; j < k; j++) offer(ax + ((bx - ax) * j) / k, ay + ((by - ay) * j) / k);
+  }
+  return [...best.values()];
 }
 
 /** 设施吸附到路网后的索引 */
@@ -223,7 +282,7 @@ export interface CategoryAccess {
 }
 
 export interface Access {
-  origin: { x: number; y: number; node: number; snap: number };
+  doors: Door[];
   paths: ShortestPaths;
   categories: CategoryAccess[];
 }
@@ -240,23 +299,21 @@ export const CATEGORY_ORDER: PoiCategory[] = [
   'school',
 ];
 
-/** 从 (x, y) 出发到各类设施的步行可达情况；maxMeters 之外不再搜索 */
+/** 从楼的出入口出发到各类设施的步行可达情况；maxMeters 之外不再搜索 */
 export function accessFrom(
   graph: WalkGraph,
   pois: readonly SnappedPoi[],
-  x: number,
-  y: number,
+  doors: readonly Door[],
   maxMeters = 2000,
 ): Access {
-  const { node, distance: snap } = graph.nearest(x, y);
-  const paths = graph.shortest(node, maxMeters);
+  const paths = graph.shortestFrom(doors, maxMeters);
   const categories = CATEGORY_ORDER.map((category): CategoryAccess => {
     let nearest: SnappedPoi | null = null;
     let meters = Number.POSITIVE_INFINITY;
     let within10 = 0;
     for (const p of pois) {
       if (p.poi.category !== category) continue;
-      const d = snap + (paths.dist[p.node] as number) + p.snap;
+      const d = (paths.dist[p.node] as number) + p.snap;
       if (d < meters) {
         meters = d;
         nearest = p;
@@ -265,5 +322,20 @@ export function accessFrom(
     }
     return { category, nearest, meters, within10 };
   });
-  return { origin: { x, y, node, snap }, paths, categories };
+  return { doors: [...doors], paths, categories };
+}
+
+/**
+ * 从楼走到某个设施的折线：楼的出入口 → 路网 → 设施。
+ * 起点落在外轮廓上，所以画出来的线不会从楼里面穿出来。
+ */
+export function routeToPoi(graph: WalkGraph, access: Access, target: SnappedPoi): Float64Array {
+  const nodes = graph.pathTo(access.paths, target.node);
+  const first = nodes[0];
+  const door = access.doors.find((d) => d.node === first);
+  const out: number[] = [];
+  if (door) out.push(door.x, door.y);
+  for (const v of nodes) out.push(graph.x(v), graph.y(v));
+  out.push(target.poi.x, target.poi.y);
+  return Float64Array.from(out);
 }
