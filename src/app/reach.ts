@@ -24,7 +24,10 @@ function worker(data: SceneData): { api: Comlink.Remote<ReachApi>; ready: Promis
       const station = stationOfPoi(p.name);
       return station ? [{ station, x: p.x, y: p.y }] : [];
     });
-    ready = api.init(`${import.meta.env.BASE_URL}data/region.json`, extra);
+    // 部署时 BASE_URL 是相对路径 './'，Worker 里会按 Worker 脚本的位置（assets/）解析，
+    // 所以先在主线程按页面地址换算成绝对地址
+    const url = new URL(`${import.meta.env.BASE_URL}data/region.json`, document.baseURI).href;
+    ready = api.init(url, extra);
   }
   return { api, ready };
 }
