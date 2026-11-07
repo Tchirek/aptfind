@@ -581,12 +581,30 @@ button {
   gap: 8px;
   flex-wrap: wrap;
 }
-.liv-roof {
-  align-self: center;
-  width: 14px;
-  height: 14px;
+/* 屋顶色图例：五档色带，圆点标出这栋楼 */
+.liv-key {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.liv-key-bar {
+  position: relative;
+  height: 6px;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(15, 30, 51, 0.12);
+}
+.liv-key-bar i {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(15, 30, 51, 0.25);
+  transform: translate(-50%, -50%);
 }
 .liv-score {
   font-size: 30px;

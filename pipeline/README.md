@@ -73,6 +73,16 @@ CBMF 的楼高由遥感反演，高层普遍被压低。`build_district.py` 在�
 
 运行时会逐个小区打印推算结果，与公开的层数区间对照。改过楼高后要重跑 `npm run data:sunlight`。
 
+## 宜居评分与屋顶色
+
+```bash
+npm run data:livability
+```
+
+用页面上同一个 `livabilityOf` 给核心区住宅算分，写出 `public/data/livability.json`（分数与屋顶色阶的五个分位节点）。
+改过 `district.json`、`region.json` 或日照后，按 `build_district.py` → `npm run data:sunlight` → `npm run data:livability` 的顺序重跑。
+调参时 `npx tsx scripts/livability-stats.ts` 看各维度在片区里的分布，`SHOW=小区名,小区名` 看逐项明细。
+
 ## 小区题图
 
 在采集页执行 `await jgCollect.photos()`（读 `compound-points.json`），再运行：

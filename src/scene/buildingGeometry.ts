@@ -47,34 +47,40 @@ export interface BuildingMesh {
 }
 
 /**
- * 宜居评分 → 屋顶色。取真实屋面常见的颜色：差的是砖红（陶瓦），中等是赭黄，
- * 好的是橄榄到苔绿（种植屋面）；明度沿色阶变化，红绿色弱也分得开。
- * 节点与评分的等级大致对齐：一般 ≤55、中等 70、良好 80、优秀 90。
+ * 宜居评分 → 屋顶色。五档取真实屋面常见的颜色：砖红（陶瓦）、赤陶、赭黄、橄榄、深绿（种植屋面），
+ * 相邻两档色相拉开，彩度压在屋面常见的范围里。
+ * 节点不按绝对分数，而按片区里实际分数的 5%、25%、50%、75%、95% 分位（预计算时写进 livability.json），
+ * 五档颜色都落在真实存在的楼上，好坏一眼分得开。
  */
-const ROOF_RAMP: [number, Color][] = [
-  [55, new Color('#9c6656')],
-  [70, new Color('#b49a72')],
-  [80, new Color('#a2a27c')],
-  [90, new Color('#7c9a70')],
-];
+export const ROOF_COLORS = ['#9a4e42', '#b27b5b', '#c2a76a', '#8fa064', '#5d895a'] as const;
+/** 没有预计算分位时的默认节点 */
+export const DEFAULT_ROOF_STOPS = [48, 60, 67, 73, 80] as const;
+const ROOF_RAMP = ROOF_COLORS.map((c) => new Color(c));
 
-export function roofColorOf(score: number, out = new Color()): Color {
-  const first = ROOF_RAMP[0] as [number, Color];
-  const last = ROOF_RAMP[ROOF_RAMP.length - 1] as [number, Color];
-  if (score <= first[0]) return out.copy(first[1]);
-  if (score >= last[0]) return out.copy(last[1]);
-  for (let i = 1; i < ROOF_RAMP.length; i++) {
-    const [s1, c1] = ROOF_RAMP[i] as [number, Color];
-    const [s0, c0] = ROOF_RAMP[i - 1] as [number, Color];
-    if (score <= s1) return out.copy(c0).lerp(c1, (score - s0) / (s1 - s0));
+export function roofColorOf(
+  score: number,
+  stops: readonly number[] = DEFAULT_ROOF_STOPS,
+  out = new Color(),
+): Color {
+  const n = ROOF_RAMP.length;
+  if (score <= (stops[0] as number)) return out.copy(ROOF_RAMP[0] as Color);
+  for (let i = 1; i < n; i++) {
+    const s1 = stops[i] as number;
+    if (score <= s1) {
+      const s0 = stops[i - 1] as number;
+      const t = s1 > s0 ? (score - s0) / (s1 - s0) : 1;
+      return out.copy(ROOF_RAMP[i - 1] as Color).lerp(ROOF_RAMP[i] as Color, t);
+    }
   }
-  return out.copy(last[1]);
+  return out.copy(ROOF_RAMP[n - 1] as Color);
 }
 
 export function buildBuildingGeometry(
   buildings: readonly Building[],
   /** 每栋楼的宜居评分，−1 表示不着色（用默认屋顶色） */
   scores?: Int16Array,
+  /** 色阶节点（分数），见 roofColorOf */
+  stops?: readonly number[],
 ): BuildingMesh {
   const pos: number[] = [];
   const facade: number[] = [];
@@ -95,7 +101,7 @@ export function buildBuildingGeometry(
     const score = scores?.[b.index] ?? -1;
     if (score >= 0) {
       // 同一档里也有一点明暗差，像真实的屋面
-      roofColorOf(score, roof).multiplyScalar(0.95 + 0.1 * rand(b.index + 104729));
+      roofColorOf(score, stops, roof).multiplyScalar(0.95 + 0.1 * rand(b.index + 104729));
     } else {
       roof.copy(wall).lerp(ROOF_TINT, 0.6);
     }
