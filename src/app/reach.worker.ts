@@ -6,6 +6,7 @@
 
 import * as Comlink from 'comlink';
 import { DataUtils } from 'three';
+import { Barriers } from '../engine/barriers';
 import {
   computeIsochrone,
   type Entrance,
@@ -14,6 +15,7 @@ import {
   rasterizeField,
   reachableArea,
   snapEntrances,
+  waterMask,
 } from '../engine/isochrone';
 import { MetroGraph } from '../engine/metro';
 import { loadRegion, type Region } from '../engine/region';
@@ -75,9 +77,15 @@ function pack(grid: FieldGrid, field: Float32Array): PackedField {
 
 const api = {
   /** extraEntrances：片区里来自高德的地铁出入口（站名 + 坐标） */
-  init(url: string, extraEntrances: { station: string; x: number; y: number }[]): Promise<void> {
+  init(
+    url: string,
+    extraEntrances: { station: string; x: number; y: number }[],
+    /** 片区里的屏障线段（河、水面、大路），接驳不许穿过 */
+    barriers: Float64Array,
+  ): Promise<void> {
     state = loadRegion(url).then((region) => {
       const graph = new WalkGraph(region.walk);
+      graph.setBarriers(new Barriers(barriers));
       const index = new Map(region.stations.map((s, i) => [s.name, i]));
       const entrances = snapEntrances(graph, region);
       for (const e of extraEntrances) {
@@ -111,8 +119,14 @@ const api = {
       maxCells: 1400,
       minCell: 8,
     });
-    const nearField = nearGrid ? rasterizeField(graph, iso, nearGrid, speed) : null;
-    const farField = farGrid ? rasterizeField(graph, iso, farGrid, speed) : null;
+    // 河道不让可达范围漫过去，过河只能走桥
+    const water = region.basemap.water;
+    const nearField = nearGrid
+      ? rasterizeField(graph, iso, nearGrid, speed, undefined, waterMask(nearGrid, water))
+      : null;
+    const farField = farGrid
+      ? rasterizeField(graph, iso, farGrid, speed, undefined, waterMask(farGrid, water))
+      : null;
 
     const trails: Trail[] = iso.legs.map((leg) => {
       const line = region.lines[leg.line];

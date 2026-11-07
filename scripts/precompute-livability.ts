@@ -9,6 +9,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { allEntrances } from '../src/app/entrances';
 import { livabilityOf } from '../src/app/livabilityFacts';
+import { Barriers, barrierSegments } from '../src/engine/barriers';
 import { decodeDistrict } from '../src/engine/district';
 import { buildSolids, buildWindowGrid, gridHash } from '../src/engine/geometry';
 import { MetroGraph } from '../src/engine/metro';
@@ -42,6 +43,7 @@ for (let i = 0; i < grid.count; i++) {
 
 const engine = new SunlightEngine(buildSolids(district.buildings, undefined, district.terrain));
 const graph = new WalkGraph(region.walk);
+graph.setBarriers(new Barriers(barrierSegments(district)));
 const pois = snapPois(graph, district.pois);
 const ctx = {
   district,

@@ -3,6 +3,7 @@
  * 以模块级 Promise 暴露，组件里用 React 19 的 use() 读取。
  */
 
+import { Barriers, barrierSegments } from '../engine/barriers';
 import { type District, loadDistrict } from '../engine/district';
 import { buildSolids, buildWindowGrid, gridHash, type WindowGrid } from '../engine/geometry';
 import type { Entrance } from '../engine/isochrone';
@@ -101,6 +102,7 @@ export function getRegion(): Promise<RegionData> {
     region = Promise.all([sceneData, loadRegion(`${base}data/region.json`)]).then(
       ([{ district }, r]) => {
         const graph = new WalkGraph(r.walk);
+        graph.setBarriers(new Barriers(barrierSegments(district)));
         return {
           region: r,
           graph,

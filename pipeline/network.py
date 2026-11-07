@@ -1,6 +1,6 @@
 """步行路网：从 OSM 道路构建无向图，前端在上面跑 Dijkstra 求步行距离与路线。
 
-- 快速路及其匝道、施工/规划中的道路、标了 foot=no 的路不走；
+- 快速路及其匝道、高架上的城市快速路（trunk 桥段，没有人行道）、施工/规划中的道路、标了 foot=no 的路不走；
 - 校园、小区内部道路（access=private/destination）照常可走，居民与学生都会走；
 - 节点按坐标去重（Overpass 的 out geom 不给节点编号，相同坐标即同一节点）；
 - 只有度为 2 的中间点保留形状，便于画出贴合道路的路线。
@@ -13,9 +13,24 @@ import numpy as np
 EXCLUDED = {"motorway", "motorway_link", "construction", "proposed", "platform", "raceway", "bus_guideway"}
 
 
+def elevated_expressway(tags: dict) -> bool:
+    """高架快速路与匝道：桥上没有人行道，不能走（除非标了 foot=yes 或有人行道）"""
+    if tags.get("highway") not in ("trunk", "trunk_link"):
+        return False
+    try:
+        layer = int(tags.get("layer", "0"))
+    except ValueError:
+        layer = 0
+    up = tags.get("bridge") not in (None, "no") or layer > 0
+    walk = tags.get("foot") in ("yes", "designated") or tags.get("sidewalk") not in (None, "no", "none")
+    return up and not walk
+
+
 def walkable(tags: dict) -> bool:
     hw = tags.get("highway")
     if hw is None or hw in EXCLUDED:
+        return False
+    if elevated_expressway(tags):
         return False
     if tags.get("foot") == "no" or tags.get("access") == "no":
         return False

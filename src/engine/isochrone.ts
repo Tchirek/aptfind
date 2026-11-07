@@ -166,12 +166,53 @@ export const FAR = 999;
  * 相当于穿过院落、楼间空地走到路上，比沿路走慢一些。这样街区内部不会出现空洞，
  * 等时线在路网末端自然收拢成圆头。
  */
+/**
+ * 河道在网格上占的格子：离河道中线不到半个河宽（再加半格）的格子记 1。
+ * 扩散时不往这些格子里走，可达范围不会隔着河漫到对岸；桥上的格子由桥那条边直接写入，照常连通。
+ */
+export function waterMask(
+  grid: FieldGrid,
+  water: readonly { line: Float64Array; width: number }[],
+): Uint8Array {
+  const { x0, y0, cell, nx, ny } = grid;
+  const mask = new Uint8Array(nx * ny);
+  for (const w of water) {
+    const r = w.width / 2 + cell * 0.5;
+    const pts = w.line;
+    for (let k = 0; k + 3 < pts.length; k += 2) {
+      const ax = pts[k] as number;
+      const ay = pts[k + 1] as number;
+      const bx = pts[k + 2] as number;
+      const by = pts[k + 3] as number;
+      const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - r - x0) / cell));
+      const i1 = Math.min(nx - 1, Math.floor((Math.max(ax, bx) + r - x0) / cell));
+      const j0 = Math.max(0, Math.floor((Math.min(ay, by) - r - y0) / cell));
+      const j1 = Math.min(ny - 1, Math.floor((Math.max(ay, by) + r - y0) / cell));
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
+          const px = x0 + (i + 0.5) * cell;
+          const py = y0 + (j + 0.5) * cell;
+          const t =
+            len2 === 0 ? 0 : Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / len2));
+          if (Math.hypot(px - ax - dx * t, py - ay - dy * t) <= r) mask[j * nx + i] = 1;
+        }
+      }
+    }
+  }
+  return mask;
+}
+
 export function rasterizeField(
   graph: WalkGraph,
   iso: Isochrone,
   grid: FieldGrid,
   speed: number,
   offroad = 1.4,
+  /** waterMask 的结果：扩散不进入这些格子 */
+  blocked?: Uint8Array,
 ): Float32Array {
   const { x0, y0, cell, nx, ny } = grid;
   const field = new Float32Array(nx * ny * 2).fill(FAR);
@@ -213,6 +254,7 @@ export function rasterizeField(
   const d1 = (cell * offroad) / speed;
   const d2 = d1 * Math.SQRT2;
   const relax = (o: number, q: number, w: number) => {
+    if (blocked?.[o >> 1]) return;
     for (let c = 0; c < 2; c++) {
       const v = (field[q + c] as number) + w;
       if (v < (field[o + c] as number)) field[o + c] = v;

@@ -6,6 +6,7 @@
  * 步速取 75 m/min（4.5 km/h），台阶按 1.6 倍距离计。
  */
 
+import type { Barriers } from './barriers';
 import type { Poi, PoiCategory, WalkNetwork } from './district';
 
 export const WALK_SPEED = 75;
@@ -84,6 +85,12 @@ export class WalkGraph {
   private readonly targets: Uint32Array;
   private readonly weights: Float32Array;
   private readonly cells = new Map<string, number[]>();
+  /** 接驳不许穿过的屏障（河、水面、大路）；没设时就接最近的节点 */
+  private barriers: Barriers | null = null;
+
+  setBarriers(b: Barriers | null): void {
+    this.barriers = b;
+  }
 
   constructor(net: WalkNetwork) {
     this.xy = net.nodes;
@@ -139,28 +146,33 @@ export class WalkGraph {
     return `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
   }
 
-  /** 最近的路网节点；逐圈扩大搜索，直到这一圈之外不可能更近 */
+  /**
+   * 最近的路网节点；逐圈扩大搜索，直到这一圈之外不可能更近。
+   * 设了屏障时，从 (x, y) 直线走到节点不能穿过河或大路，跳过对岸、对面的节点。
+   */
   nearest(x: number, y: number): { node: number; distance: number } {
     const cx = Math.floor(x / CELL);
     const cy = Math.floor(y / CELL);
-    let best = -1;
-    let bestD = Number.POSITIVE_INFINITY;
+    const pool: [number, number][] = [];
     for (let r = 0; r < 40; r++) {
       for (let i = cx - r; i <= cx + r; i++) {
         for (let j = cy - r; j <= cy + r; j++) {
           if (Math.max(Math.abs(i - cx), Math.abs(j - cy)) !== r) continue;
-          for (const k of this.cells.get(`${i},${j}`) ?? []) {
-            const d = Math.hypot(this.x(k) - x, this.y(k) - y);
-            if (d < bestD) {
-              bestD = d;
-              best = k;
-            }
-          }
+          for (const k of this.cells.get(`${i},${j}`) ?? [])
+            pool.push([Math.hypot(this.x(k) - x, this.y(k) - y), k]);
         }
       }
-      if (best >= 0 && bestD <= r * CELL) break;
+      // 这一圈以内的候选已经齐了：由近到远找第一个不隔河、不隔大路的
+      pool.sort((a, b) => a[0] - b[0]);
+      while (pool.length && (pool[0] as [number, number])[0] <= r * CELL) {
+        const [d, k] = pool.shift() as [number, number];
+        if (!this.barriers?.crosses(x, y, this.x(k), this.y(k))) return { node: k, distance: d };
+      }
     }
-    return { node: best, distance: bestD };
+    for (const [d, k] of pool) {
+      if (!this.barriers?.crosses(x, y, this.x(k), this.y(k))) return { node: k, distance: d };
+    }
+    return { node: -1, distance: Number.POSITIVE_INFINITY };
   }
 
   /** 从 source 出发的最短路，超过 maxDist 的节点不再展开 */
