@@ -92,17 +92,19 @@ export function SearchBox({ data }: { data: SceneData }) {
       {open && results.length > 0 && (
         <ul className="search-dropdown">
           {results.map((e, i) => (
-            <li
-              key={`${e.kind}-${e.name}-${i}`}
-              className={`search-item${i === hl ? ' hl' : ''}`}
-              onMouseDown={(ev) => ev.preventDefault()}
-              onClick={() => handleSelect(e)}
-            >
-              <span className="search-dot" style={{ background: DOT_COLOR[e.kind] }} />
-              <div className="search-info">
-                <div className="search-name">{e.name}</div>
-                <div className="search-detail">{e.detail}</div>
-              </div>
+            <li key={`${e.kind}-${e.building ?? e.compound ?? ''}-${e.name}-${e.x.toFixed(0)}`}>
+              <button
+                type="button"
+                className={`search-item${i === hl ? ' hl' : ''}`}
+                onMouseDown={(ev) => ev.preventDefault()}
+                onClick={() => handleSelect(e)}
+              >
+                <span className="search-dot" style={{ background: DOT_COLOR[e.kind] }} />
+                <span className="search-info">
+                  <span className="search-name">{e.name}</span>
+                  <span className="search-detail">{e.detail}</span>
+                </span>
+              </button>
             </li>
           ))}
         </ul>
