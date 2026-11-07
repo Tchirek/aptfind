@@ -9,6 +9,7 @@
  *   await jgCollect.roads()   逆地理编码：OSM 里没有名字的道路，沿线样点附近的道路名
  *   await jgCollect.pois()    按类别搜索片区内的设施 POI
  *   await jgCollect.brands()  麦当劳、星巴克、海底捞（片区外扩约 3 km）
+ *   await jgCollect.photos()  小区、校园的地点详情照片（读 compound-points.json，由管线生成）
  */
 
 import { wgs84ToGcj02 } from './gcj02';
@@ -323,7 +324,50 @@ async function campusNames(): Promise<number> {
   return found.size;
 }
 
-const api = { regeo, roads, pois, brands, campusNames };
+interface CompoundPoint {
+  name: string;
+  kind: string;
+  lon: number;
+  lat: number;
+}
+
+/** 名字归一：去掉括号、间隔号、"小区""一期"之类的后缀差别不在这里处理 */
+const normName = (s: string) => s.replace(/[（(].*?[）)]/g, '').replace(/[·•\s-]/g, '');
+
+/**
+ * 每个小区、校园按名字在附近搜地点，取名字对得上、离地块中心 1.2 km 以内的第一条，
+ * 记下它详情里的第一张照片。
+ */
+async function photos(): Promise<number> {
+  const input = (await (
+    await fetch('/pipeline/raw/amap/compound-points.json')
+  ).json()) as CompoundPoint[];
+  const out: Record<string, { url: string; poi: string; id: string }> = {};
+  for (const c of input) {
+    const [lng, lat] = wgs84ToGcj02(c.lon, c.lat);
+    const ps = new window.AMap.PlaceSearch({ pageSize: 10, pageIndex: 1, extensions: 'all' });
+    // biome-ignore lint/suspicious/noExplicitAny: 高德回调结果
+    const r = await new Promise<any>((resolve) => {
+      // biome-ignore lint/suspicious/noExplicitAny: 高德回调结果
+      ps.searchNearBy(normName(c.name), [lng, lat], 1200, (status: string, res: any) =>
+        resolve(status === 'complete' ? res : { poiList: { pois: [] } }),
+      );
+    });
+    const want = normName(c.name);
+    // biome-ignore lint/suspicious/noExplicitAny: 高德 POI
+    const hit = (r.poiList?.pois ?? []).find((p: any) => {
+      const n = normName(p.name);
+      return (n.includes(want) || want.includes(n)) && (p.photos?.length ?? 0) > 0;
+    });
+    if (hit) out[c.name] = { url: hit.photos[0].url, poi: hit.name, id: hit.id };
+    log(`${c.name}：${hit ? hit.name : '无图'}（${Object.keys(out).length}/${input.length}）`);
+    await sleep(420);
+  }
+  await save('photos', out);
+  return Object.keys(out).length;
+}
+
+const api = { regeo, roads, pois, brands, campusNames, photos };
 
 loadAMap()
   .then(() => {
