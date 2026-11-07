@@ -8,7 +8,7 @@ import { selectedBuilding, useApp } from '../app/store';
 import { dayTimes } from '../app/time';
 import type { WindowGrid } from '../engine/geometry';
 import { warmSpanFor } from '../ui/palette';
-import { isDrag } from './Buildings';
+import { buildingViewDistance, flyToBuilding, isDrag } from './Buildings';
 import {
   buildFacadeGeometry,
   facadeMaterial,
@@ -73,6 +73,7 @@ function windowCenter(grid: WindowGrid, i: number): [number, number, number] {
 export function Facades({ data }: { data: SceneData }) {
   const selection = useApp((s) => s.selection);
   const select = useApp((s) => s.select);
+  const requestFly = useApp((s) => s.requestFly);
   const sunlight = useApp((s) => s.sunlight);
   const { grid } = data;
   const building = selectedBuilding(selection, grid);
@@ -119,12 +120,17 @@ export function Facades({ data }: { data: SceneData }) {
   const toWindow = (e: ThreeEvent<PointerEvent | MouseEvent>) =>
     e.face ? start + vertexToWindow(e.face.a) : null;
 
+  // 选窗：楼已选中，这是"再点一下"，镜头还离得远就顺便拉过去
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (isDrag(e)) return;
     const i = toWindow(e);
     if (i === null) return;
     e.stopPropagation();
     select({ kind: 'window', index: i });
+    const b = building === null ? undefined : data.district.buildings[building];
+    if (b && e.camera.position.distanceTo(e.point) > buildingViewDistance(b) * 1.6) {
+      flyToBuilding(b, requestFly);
+    }
   };
 
   const hoverMinutes =

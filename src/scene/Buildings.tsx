@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { EdgesGeometry } from 'three';
 import type { SceneData } from '../app/data';
 import { selectedBuilding, useApp } from '../app/store';
+import type { Building } from '../engine/district';
 import { buildSolids } from '../engine/geometry';
 import { buildBuildingGeometry } from './buildingGeometry';
 import { buildingUniforms, createBuildingMaterial } from './buildingMaterial';
@@ -23,6 +24,17 @@ export function centroid(ring: Float64Array): [number, number] {
 
 /** 拖动视角时不算点击 */
 export const isDrag = (e: ThreeEvent<MouseEvent>) => e.delta > 4;
+
+/** 看向一栋楼的取景距离 */
+export const buildingViewDistance = (b: Building) => Math.max(110, b.height * 3.2);
+
+export function flyToBuilding(
+  b: Building,
+  requestFly: (target: [number, number, number], distance: number) => void,
+) {
+  const [cx, cy] = centroid(b.rings[0] as Float64Array);
+  requestFly([cx, cy, b.base + b.height * 0.45], buildingViewDistance(b));
+}
 
 /**
  * 全部建筑合成一个网格：程序化立面 + 实时阴影。
@@ -63,18 +75,17 @@ export function Buildings({ data }: { data: SceneData }) {
     return building?.core ? building : null;
   };
 
+  // 点一下只选中；再点同一栋才把镜头拉过去
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (isDrag(e)) return;
     const building = pick(e);
     if (!building) return;
     e.stopPropagation();
-    if (building.index === current) return;
-    select({ kind: 'building', index: building.index });
-    const [cx, cy] = centroid(building.rings[0] as Float64Array);
-    requestFly(
-      [cx, cy, building.base + building.height * 0.45],
-      Math.max(110, building.height * 3.2),
-    );
+    if (building.index !== current) {
+      select({ kind: 'building', index: building.index });
+      return;
+    }
+    flyToBuilding(building, requestFly);
   };
 
   return (
