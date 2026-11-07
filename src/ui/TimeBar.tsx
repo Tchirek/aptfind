@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { formatClock } from '../app/format';
 import { useApp } from '../app/store';
 import {
@@ -55,6 +55,28 @@ function NowIcon() {
   );
 }
 
+/** 地平线上半个太阳：节气 */
+function TermsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M3.5 11a4.5 4.5 0 0 1 9 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M1.5 11h13M8 2.5v1.6M3.2 4.6l1.1 1.1M12.8 4.6l-1.1 1.1M8 13.5h0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function TimeBar() {
   const ref = useRef<HTMLDivElement>(null);
   const date = useApp((s) => s.date);
@@ -62,6 +84,8 @@ export function TimeBar() {
   const live = useApp((s) => s.live);
   const playing = useApp((s) => s.playing);
   const { setDate, setMinute, setPlaying, goLive, syncNow } = useApp.getState();
+  // 手机上节气默认收起，由日期旁的图标唤出（桌面上一直显示，这个状态不起作用）
+  const [termsOpen, setTermsOpen] = useState(false);
 
   const { sunrise, sunset } = dayTimes(date);
 
@@ -118,9 +142,9 @@ export function TimeBar() {
   const sunsetPct = (sunset / 1440) * 100;
   const trackGradient =
     `linear-gradient(to right, ` +
-    `#d9d5cc 0%, #d9d5cc ${sunrisePct}%, ` +
+    `#d6dee9 0%, #d6dee9 ${sunrisePct}%, ` +
     `#efc98a ${sunrisePct}%, #efc98a ${sunsetPct}%, ` +
-    `#d9d5cc ${sunsetPct}%, #d9d5cc 100%)`;
+    `#d6dee9 ${sunsetPct}%, #d6dee9 100%)`;
 
   return (
     <div className="panel timebar" ref={ref}>
@@ -135,7 +159,16 @@ export function TimeBar() {
           }}
           aria-label="日期"
         />
-        <fieldset className="tb-terms" aria-label="节气">
+        <button
+          type="button"
+          className={`tb-terms-btn${termsOpen ? ' on' : ''}`}
+          onClick={() => setTermsOpen(!termsOpen)}
+          aria-label="节气"
+          aria-expanded={termsOpen}
+        >
+          <TermsIcon />
+        </button>
+        <fieldset className={`tb-terms${termsOpen ? ' open' : ''}`} aria-label="节气">
           {TERM_PICKS.map((term) => {
             const d = upcomingTerm(term, nowBeijing().date);
             const selected = sameDate(date, d);
@@ -145,7 +178,10 @@ export function TimeBar() {
                 key={term}
                 className={`tb-term${selected ? ' on' : ''}`}
                 aria-pressed={selected}
-                onClick={() => setDate(d)}
+                onClick={() => {
+                  setDate(d);
+                  setTermsOpen(false);
+                }}
               >
                 {term}
                 <small>
@@ -168,10 +204,10 @@ export function TimeBar() {
         </button>
 
         <div className="tb-slider-wrap">
-          <div className="tb-track" style={{ background: trackGradient }} />
           <input
             type="range"
             className="tb-range"
+            style={{ '--track': trackGradient } as CSSProperties}
             min={0}
             max={1439}
             step={1}
