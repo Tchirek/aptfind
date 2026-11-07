@@ -228,6 +228,9 @@ def explode_polygons(geom) -> list[Polygon]:
     return [g for g in getattr(geom, "geoms", []) if isinstance(g, Polygon)]
 
 
+# 地面上各级道路画出的路面宽度（米），与 src/scene/groundTexture.ts 的 ROAD_WIDTH 保持一致
+ROAD_DRAW_WIDTH = [26, 20, 14, 9, 6, 3.5]
+
 ROAD_CLASSES = {
     "motorway": 0, "trunk": 0, "primary": 1, "secondary": 2, "tertiary": 3,
     "motorway_link": 2, "trunk_link": 2, "primary_link": 2, "secondary_link": 3, "tertiary_link": 3,
@@ -755,6 +758,47 @@ def main() -> None:
         hw = tags["highway"]
         roads.append({"n": road_names.get(wid), "c": ROAD_CLASSES[hw], "b": 1 if tags.get("bridge") == "yes" else 0,
                       "p": line_dm(line.simplify(0.5).coords)})
+
+    # ---------------- 压在路面上的建筑
+    # 地面按道路等级画出路面（宽度与前端 groundTexture 的 ROAD_WIDTH 一致）。CBMF 偶尔把路边棚子、
+    # 车辆识别成楼，也有足迹与 OSM 道路中线差了几米，画出来就是楼压在马路上。
+    # 只看支路及以上、不在桥上的路：过半落在路面里的足迹删去；部分压到的切掉路面那一块，
+    # 剩下的仍像一栋楼（面积、宽度够，且不少于原来一半）才保留。
+    def elevated(tags: dict) -> bool:
+        try:
+            return tags.get("bridge") not in (None, "no") or int(tags.get("layer", "0")) > 0
+        except ValueError:
+            return False
+
+    strips = [
+        line.buffer(ROAD_DRAW_WIDTH[ROAD_CLASSES[tags["highway"]]] / 2, cap_style=2)
+        for _, line, tags in road_lines
+        if ROAD_CLASSES[tags["highway"]] <= 3 and not elevated(tags) and not tags.get("tunnel")
+    ]
+    road_surface = shapely.union_all(strips) if strips else Polygon()
+    surface_tree = STRtree(strips) if strips else None
+    on_road: Counter = Counter()
+    kept: list[dict] = []
+    for b in buildings:
+        p = b["poly"]
+        if surface_tree is None or b["src"] == "survey" or not len(surface_tree.query(p, predicate="intersects")):
+            kept.append(b)
+            continue
+        overlap = p.intersection(road_surface).area / p.area
+        if overlap <= 0.02:
+            kept.append(b)
+        elif overlap > 0.5:
+            on_road["删去"] += 1
+        else:
+            rest = max(explode_polygons(p.difference(road_surface)), key=lambda q: q.area, default=None)
+            if rest is None or rest.area < max(MIN_AREA, 0.5 * p.area) or min_width(rest) < MIN_WIDTH:
+                on_road["删去"] += 1
+                continue
+            b["poly"] = shapely.geometry.polygon.orient(rest.simplify(SIMPLIFY, preserve_topology=True), 1.0)
+            on_road["切掉路面"] += 1
+            kept.append(b)
+    buildings = kept
+    print(f"  压在路面上的建筑：{dict(on_road)}", file=sys.stderr)
 
     water = [{"r": ring_dm(p.simplify(1.0).exterior.coords)} for p in water_polys]
     water += [{"l": line_dm(l.simplify(1.0).coords), "w": w} for l, w in water_lines if l.intersects(outer_local.buffer(200))]
