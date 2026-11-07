@@ -39,8 +39,18 @@ export function CameraRig() {
   }, [flyTo, camera, controls]);
 
   useFrame(() => {
-    const a = anim.current;
     const c = controls as unknown as Controls | null;
+    if (c && 'near' in camera) {
+      const dist = camera.position.distanceTo(c.target);
+      const near = Math.min(200, Math.max(2, dist * 0.004));
+      const far = Math.max(16000, dist * 8);
+      if (Math.abs(camera.near - near) > near * 0.2 || Math.abs(camera.far - far) > far * 0.2) {
+        camera.near = near;
+        camera.far = far;
+        camera.updateProjectionMatrix();
+      }
+    }
+    const a = anim.current;
     if (!a || !c) return;
     const t = Math.min(1, (performance.now() - a.t0) / DURATION);
     const k = ease(t);
