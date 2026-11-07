@@ -52,6 +52,11 @@ export interface Compound {
   /** 上级地块（如桂苑的上级是川师狮子山校区），-1 表示没有 */
   parent: number;
   builtYear: number | null;
+  /** 物业费（元/㎡·月）、绿化率（%）、容积率、物业公司；查不到为 null */
+  propertyFee: number | null;
+  greenRatio: number | null;
+  plotRatio: number | null;
+  propertyCompany: string | null;
   rings: Float64Array[];
 }
 
@@ -153,6 +158,10 @@ interface DistrictJson {
     o: 'osm' | 'derived';
     p?: number;
     y?: number;
+    pf?: number;
+    gr?: number;
+    fr?: number;
+    pm?: string;
     r: number[][];
   }[];
   buildings: {
@@ -199,6 +208,10 @@ export function decodeDistrict(json: DistrictJson): District {
       source: c.o,
       parent: c.p ?? -1,
       builtYear: c.y ?? null,
+      propertyFee: c.pf ?? null,
+      greenRatio: c.gr ?? null,
+      plotRatio: c.fr ?? null,
+      propertyCompany: c.pm ?? null,
       rings: c.r.map(decode),
     })),
     buildings: json.buildings.map((b, index) => ({

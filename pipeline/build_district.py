@@ -654,6 +654,20 @@ def main() -> None:
                 label = None
         b["label"] = label
 
+    # ---------------- 功能以高德的地块类型为准
+    # CBMF 的功能是遥感模型猜的，把酒店、宿舍、学校楼、加油站都猜成了住宅。
+    # 楼所在地块在高德里是学校、酒店、市场、公园等非住宅类型时，改记为教育或商业/公共。
+    reclassed: Counter = Counter()
+    for b in buildings:
+        if b["cls"] != "R" or b["compound"] is None:
+            continue
+        kind = compounds[b["compound"]]["kind"]
+        if kind == "residential":
+            continue
+        b["cls"] = "E" if kind == "school" else "C"
+        reclassed[kind] += 1
+    print(f"  按地块类型改正的住宅楼：{dict(reclassed)}", file=sys.stderr)
+
     # ---------------- 楼高校正
     # CBMF 的高度由遥感反演，高层普遍被压低（OSM 标了 35、38 层的塔楼在 CBMF 里只有 7–14 层）。
     # 1) OSM 上标了 building:levels 的楼直接用它；
@@ -848,6 +862,13 @@ def main() -> None:
                 **({"p": c["parent"]} if c.get("parent") is not None else {}),
                 "r": [ring_dm(p.exterior.coords) for p in c["parts"]],
                 **({"y": int(info[c["name"]]["built_year"])} if info.get(c["name"], {}).get("built_year") else {}),
+                # 物业费（元/㎡·月）、绿化率（%）、容积率、物业公司：小区品质的公开指标
+                **{
+                    key: float(info[c["name"]][col])
+                    for key, col in (("pf", "property_fee"), ("gr", "green_ratio"), ("fr", "plot_ratio"))
+                    if info.get(c["name"], {}).get(col)
+                },
+                **({"pm": info[c["name"]]["property_company"]} if info.get(c["name"], {}).get("property_company") else {}),
             }
             for c in compounds
         ],
