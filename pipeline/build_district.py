@@ -53,6 +53,12 @@ SURVEY = ROOT / "pipeline" / "survey.csv"
 SURVEY_TODO = ROOT / "pipeline" / "survey_todo.csv"
 COMPOUND_INFO = ROOT / "pipeline" / "compound_info.csv"
 COMPOUND_HEIGHTS = ROOT / "pipeline" / "compound_heights.csv"
+# 对口小学：锦江区教育局 2025 年《小学户籍适龄儿童入学划片范围》（成都本地宝 2025-06-17 转载，
+# m.cd.bendibao.com/edu/198845.shtm）。划片按门牌，小区门牌取高德地点登记的地址（tools/amap.html 的
+# addresses()），与房天下小区页对照；查不到门牌或门牌不在划片表里的小区不填，页面上按最近的公办小学算。
+# 2026 年公告原文未能取得；这几条街的归属 2022–2025 年未变。
+PRIMARY_SCHOOLS = ROOT / "pipeline" / "primary_schools.csv"
+SCHOOL_CATCHMENT = ROOT / "pipeline" / "school_catchment.csv"
 # 每户住宅建筑面积（含公摊），由户数反推塔楼层数用
 GFA_PER_HOUSEHOLD = 100.0
 # 没有公开最高层数时的上限：成都住宅塔楼绝大多数在 100 m（约 34 层）以下
@@ -272,6 +278,33 @@ def read_csv(path: Path, key: str) -> dict[str, dict]:
         return {}
     with path.open(encoding="utf-8") as f:
         return {row[key]: row for row in csv.DictReader(f) if row.get(key)}
+
+
+def load_schools(compound_names: set[str]) -> tuple[list[dict], dict[str, int]]:
+    """划片表里的公办小学（位置取高德按校名搜到的地点）与各小区的对口小学下标"""
+    found = json.loads((AMAP_RAW / "poi-catchment-schools.json").read_text(encoding="utf-8"))
+    hits = {h["poi"]: h for hs in found.values() for h in hs}
+    with PRIMARY_SCHOOLS.open(encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    schools: list[dict] = []
+    index: dict[str, int] = {}
+    for row in rows:
+        hit = hits.get(row["amap_poi"])
+        if hit is None:
+            raise SystemExit(f"高德地点里没有 {row['amap_poi']}，先在 tools/amap.html 跑 schools()")
+        x, y = xy_local(*amap.parse_location(hit["location"]))
+        index[row["name"]] = len(schools)
+        schools.append({"n": row["short"], "p": [dm(float(x)), dm(float(y))]})
+    catchment: dict[str, int] = {}
+    with SCHOOL_CATCHMENT.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row["name"] not in compound_names:
+                raise SystemExit(f"对口小学表里的小区 {row['name']} 不在地块里")
+            if row["school"] not in index:
+                raise SystemExit(f"对口小学表里的学校 {row['school']} 不在 primary_schools.csv 里")
+            catchment[row["name"]] = index[row["school"]]
+    print(f"  对口小学：{len(schools)} 所公办小学，{len(catchment)} 个小区查到划片", file=sys.stderr)
+    return schools, catchment
 
 
 # ---------------------------------------------------------------- 地名
@@ -643,6 +676,7 @@ def main() -> None:
         if c.get("parent") is not None:
             c["parent"] = remap[c["parent"]]
     info = read_csv(COMPOUND_INFO, "name")
+    schools, catchment = load_schools({c["name"] for c in compounds})
 
     for i, b in enumerate(buildings):
         b["compound"] = remap[member[i]] if i in member else None
@@ -869,9 +903,11 @@ def main() -> None:
                     if info.get(c["name"], {}).get(col)
                 },
                 **({"pm": info[c["name"]]["property_company"]} if info.get(c["name"], {}).get("property_company") else {}),
+                **({"ps": catchment[c["name"]]} if c["name"] in catchment else {}),
             }
             for c in compounds
         ],
+        "schools": schools,
         "buildings": [
             {
                 "id": b["id"],

@@ -57,6 +57,8 @@ export interface Compound {
   greenRatio: number | null;
   plotRatio: number | null;
   propertyCompany: string | null;
+  /** 对口公办小学在 District.schools 里的下标（按划片），-1 表示没查到 */
+  primarySchool: number;
   rings: Float64Array[];
 }
 
@@ -134,6 +136,8 @@ export interface District {
   roads: Road[];
   water: Water[];
   pois: Poi[];
+  /** 划片表里的公办小学；可能在片区外，不混进 pois（那边是地图标注与可达范围用的） */
+  schools: Poi[];
 }
 
 interface DistrictJson {
@@ -162,6 +166,7 @@ interface DistrictJson {
     gr?: number;
     fr?: number;
     pm?: string;
+    ps?: number;
     r: number[][];
   }[];
   buildings: {
@@ -179,6 +184,7 @@ interface DistrictJson {
   roads: { n: string | null; c: number; b: 0 | 1; l?: number; o?: -1 | 1; p: number[] }[];
   water: ({ r: number[] } | { l: number[]; w: number })[];
   pois: { n: string; c: PoiCategory; p: [number, number] }[];
+  schools?: { n: string; p: [number, number] }[];
 }
 
 const DM = 0.1;
@@ -212,6 +218,7 @@ export function decodeDistrict(json: DistrictJson): District {
       greenRatio: c.gr ?? null,
       plotRatio: c.fr ?? null,
       propertyCompany: c.pm ?? null,
+      primarySchool: c.ps ?? -1,
       rings: c.r.map(decode),
     })),
     buildings: json.buildings.map((b, index) => ({
@@ -241,6 +248,12 @@ export function decodeDistrict(json: DistrictJson): District {
         : { ring: null, line: decode(w.l), width: w.w },
     ),
     pois: json.pois.map((p) => ({ name: p.n, category: p.c, x: p.p[0] * DM, y: p.p[1] * DM })),
+    schools: (json.schools ?? []).map((s) => ({
+      name: s.n,
+      category: 'school' as const,
+      x: s.p[0] * DM,
+      y: s.p[1] * DM,
+    })),
   };
 }
 
