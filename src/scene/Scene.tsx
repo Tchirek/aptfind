@@ -5,7 +5,7 @@ import { NeutralToneMapping, type PerspectiveCamera } from 'three';
 import type { SceneData } from '../app/data';
 import { useApp } from '../app/store';
 import { Buildings } from './Buildings';
-import { CameraRig } from './CameraRig';
+import { CameraRig, MAX_DISTANCE } from './CameraRig';
 import { ENU_ROTATION_X } from './coords';
 import { DevHandle } from './DevHandle';
 import { Facades } from './Facades';
@@ -70,8 +70,8 @@ export function Scene({ data }: { data: SceneData }) {
         enableDamping
         dampingFactor={0.12}
         minDistance={30}
-        maxDistance={26000}
-        maxPolarAngle={1.42}
+        maxDistance={MAX_DISTANCE}
+        maxPolarAngle={1.38}
         screenSpacePanning={false}
       />
       <CameraRig />
