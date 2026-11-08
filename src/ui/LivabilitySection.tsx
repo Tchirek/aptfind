@@ -6,7 +6,7 @@ function Facts({ facts }: { facts: Fact[] }) {
   return (
     <dl className="liv-facts">
       {facts.map((f) => (
-        <div key={f.label}>
+        <div key={f.label} className={f.wide ? 'wide' : undefined}>
           <dt>{f.label}</dt>
           <dd className="mono">
             {f.value.startsWith('~') ? (

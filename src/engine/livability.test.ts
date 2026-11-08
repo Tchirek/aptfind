@@ -185,3 +185,22 @@ describe('物业与底商', () => {
     expect(a(300)).toBeCloseTo(a(80), 5);
   });
 });
+
+describe('对口小学', () => {
+  const education = (facts: LivabilityFacts) =>
+    scoreLivability(facts).dimensions.find((d) => d.key === 'education');
+
+  it('查到划片时写校名，按到对口那所的步行时间计分', () => {
+    const near = education({ ...good, primarySchool: '菱窠路小学', primaryMinutes: 5 });
+    const far = education({ ...good, primarySchool: '菱窠路小学', primaryMinutes: 25 });
+    const fact = near?.facts.find((f) => f.label === '对口小学');
+    expect(fact?.value).toBe('菱窠路小学 5 分钟');
+    expect(fact?.wide).toBe(true);
+    expect((near?.score ?? 0) - (far?.score ?? 0)).toBeCloseTo(3.2, 5);
+  });
+
+  it('没查到划片时只写步行时间', () => {
+    const facts = education({ ...good, primarySchool: null })?.facts ?? [];
+    expect(facts.map((f) => f.label)).toEqual(['幼儿园', '小学', '中学']);
+  });
+});

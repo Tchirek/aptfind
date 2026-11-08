@@ -41,6 +41,8 @@ export type Tone = 'good' | 'fair' | 'poor';
 export interface Fact {
   label: string;
   value: string;
+  /** 数值较长（如校名），在四列的格子里占两格 */
+  wide?: boolean;
 }
 
 export interface Dimension {
@@ -89,6 +91,8 @@ export interface LivabilityFacts {
   hospitalMinutes: number;
   kindergartenMinutes: number;
   primaryMinutes: number;
+  /** 对口公办小学（按划片）；没查到划片时为空，primaryMinutes 是最近一所公办小学 */
+  primarySchool?: string | null;
   middleMinutes: number;
   /** 步行 10 分钟内各类设施的家数 */
   within10: {
@@ -247,14 +251,21 @@ function amenityDimension(facts: LivabilityFacts): Dimension {
   ]);
 }
 
-/** 教育：步行到幼儿园、小学、中学 */
+/** 教育：步行到幼儿园、对口小学、中学。小学按划片算到对口的那所，不是最近的一所 */
 function educationDimension(facts: LivabilityFacts): Dimension {
   const k = 2.4 * nearBy(facts.kindergartenMinutes, 3, 15);
   const p = 3.2 * nearBy(facts.primaryMinutes, 5, 20);
   const m = 2.4 * nearBy(facts.middleMinutes, 8, 30);
+  const primary: Fact = facts.primarySchool
+    ? {
+        label: '对口小学',
+        value: `${facts.primarySchool} ${walk(facts.primaryMinutes)}`,
+        wide: true,
+      }
+    : { label: '小学', value: walk(facts.primaryMinutes) };
   return dimension('education', '教育', k + p + m, MAX.education, [
     { label: '幼儿园', value: walk(facts.kindergartenMinutes) },
-    { label: '小学', value: walk(facts.primaryMinutes) },
+    primary,
     { label: '中学', value: walk(facts.middleMinutes) },
   ]);
 }

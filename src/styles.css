@@ -659,6 +659,9 @@ button {
 .liv-facts div {
   min-width: 0;
 }
+.liv-facts .wide {
+  grid-column: span 2;
+}
 .liv-facts dt {
   font-size: 10px;
   line-height: 14px;

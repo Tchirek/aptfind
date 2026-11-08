@@ -20,6 +20,7 @@ import {
   buildingDoors,
   minutesOf,
   type SnappedPoi,
+  snapPois,
   type WalkGraph,
 } from '../engine/walk';
 
@@ -59,10 +60,43 @@ export function builtYearOf(d: District, compound: number): number | null {
 const HOSPITAL = (p: Poi) =>
   p.category === 'medical' && /医院/.test(p.name) && !/美容|口腔|宠物|动物/.test(p.name);
 const KINDERGARTEN = (p: Poi) => p.category === 'school' && /幼儿园|托育/.test(p.name);
-/** 九年一贯制的"实验学校""师一学校"同时算小学与中学 */
+/** 九年一贯制的"实验学校""师一学校"同时算小学与中学；小学只在没有划片数据时用 */
 const PRIMARY = (p: Poi) => p.category === 'school' && /小学|实验学校|师一学校|附小/.test(p.name);
 const MIDDLE = (p: Poi) =>
   p.category === 'school' && /中学|附中|高中|初中|实验学校|师一学校/.test(p.name);
+
+/** 划片表里的公办小学，按步行网吸附一次（同一张步行网只做一遍） */
+const snappedSchools = new WeakMap<WalkGraph, SnappedPoi[]>();
+function schoolsOn(ctx: LivabilityContext): SnappedPoi[] {
+  let s = snappedSchools.get(ctx.graph);
+  if (!s) {
+    s = snapPois(ctx.graph, ctx.district.schools);
+    snappedSchools.set(ctx.graph, s);
+  }
+  return s;
+}
+
+/**
+ * 小学：有划片就是对口的那所；没查到划片的小区取最近的公办小学，不算民办
+ * （民办摇号入学，离得近也不一定上得了）。
+ */
+function primarySchoolOf(ctx: LivabilityContext, access: Access, compound: number) {
+  const schools = schoolsOn(ctx);
+  if (schools.length === 0)
+    return { name: null, minutes: nearestMinutes(access, ctx.pois, PRIMARY) };
+  const c = ctx.district.compounds[compound];
+  const parent = c && c.parent >= 0 ? ctx.district.compounds[c.parent] : undefined;
+  const k = c && c.primarySchool >= 0 ? c.primarySchool : (parent?.primarySchool ?? -1);
+  const assigned = schools[k];
+  if (assigned) {
+    const d = (access.paths.dist[assigned.node] as number) + assigned.snap;
+    return {
+      name: assigned.poi.name,
+      minutes: Number.isFinite(d) ? minutesOf(d) : Number.POSITIVE_INFINITY,
+    };
+  }
+  return { name: null, minutes: nearestMinutes(access, schools, () => true) };
+}
 
 /** 在已算好的步行最短路上，找满足条件的最近一处，返回分钟数 */
 function nearestMinutes(access: Access, pois: readonly SnappedPoi[], pick: (p: Poi) => boolean) {
@@ -182,6 +216,7 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
       : minutesOf(meters);
   };
   const view = windowView(ctx, building);
+  const primary = primarySchoolOf(ctx, access, b.compound);
 
   return scoreLivability({
     windows,
@@ -193,7 +228,8 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
     marketMinutes: minutes('market'),
     hospitalMinutes: nearestMinutes(access, ctx.pois, HOSPITAL),
     kindergartenMinutes: nearestMinutes(access, ctx.pois, KINDERGARTEN),
-    primaryMinutes: nearestMinutes(access, ctx.pois, PRIMARY),
+    primaryMinutes: primary.minutes,
+    primarySchool: primary.name,
     middleMinutes: nearestMinutes(access, ctx.pois, MIDDLE),
     within10: {
       grocery: cat('grocery')?.within10 ?? 0,
