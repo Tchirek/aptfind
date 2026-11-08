@@ -27,6 +27,8 @@ function district(patch: Partial<District> = {}): District {
     roads: [],
     water: [],
     pois: [],
+    schools: [],
+    rails: [],
     ...patch,
   };
 }

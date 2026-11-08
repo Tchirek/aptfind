@@ -204,3 +204,19 @@ describe('对口小学', () => {
     expect(facts.map((f) => f.label)).toEqual(['幼儿园', '小学', '中学']);
   });
 });
+
+describe('铁路噪声', () => {
+  it('离铁路干线近扣分，计入交通噪声并写明距离', () => {
+    const r = scoreLivability({ ...good, railMeters: 50 });
+    const noise = r.penalties.find((p) => p.label === '交通噪声');
+    expect(noise?.points).toBeCloseTo(4.5, 5);
+    expect(noise?.facts[0]).toEqual({ label: '距铁路', value: '50 m' });
+  });
+
+  it('与道路取最重的一项，不叠加', () => {
+    const r = scoreLivability({ ...good, railMeters: 150, roads: [20, 300, 300] });
+    const noise = r.penalties.filter((p) => p.label === '交通噪声');
+    expect(noise).toHaveLength(1);
+    expect(noise[0]?.facts[0]?.label).toBe('距快速路');
+  });
+});

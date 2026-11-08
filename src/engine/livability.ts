@@ -110,6 +110,8 @@ export interface LivabilityFacts {
   coverage: number;
   /** 到最近的快速路、主干道、次干道的直线距离（米），没有为 Infinity */
   roads: readonly [number, number, number];
+  /** 到最近铁路干线的距离（米），附近没有为无穷远 */
+  railMeters?: number;
   /** 地上层数 */
   floors: number;
   /** 层数是推算的（遥感或按户数），界面上加 ~ */
@@ -356,24 +358,36 @@ function adjacentFoodPenalty(facts: LivabilityFacts): Penalty | null {
   return { label: '油烟扰民', points, facts: facts2, detail: joinFacts(facts2) };
 }
 
-/** 交通噪声：快速路影响最远、扣得最多，主干道次之，次干道只管贴边的楼；取最重的一条 */
-const NOISE: { radius: number; cap: number; name: string }[] = [
+interface NoiseSource {
+  radius: number;
+  cap: number;
+  name: string;
+}
+
+/** 交通噪声：快速路影响最远、扣得最多，主干道次之，次干道只管贴边的楼；取最重的一项 */
+const NOISE: NoiseSource[] = [
   { radius: 220, cap: 8, name: '快速路' },
   { radius: 130, cap: 5, name: '主干道' },
   { radius: 70, cap: 2.5, name: '次干道' },
 ];
+/**
+ * 铁路干线：列车经过时是间歇的强噪声，夜里的货车与鸣笛更扰人；
+ * 片区东侧是成渝、成贵、成宜高铁与东环线，多在高架上，声音传得开。按快速路与主干道之间算
+ */
+const RAIL_NOISE: NoiseSource = { radius: 200, cap: 6, name: '铁路' };
 
 function noisePenalty(facts: LivabilityFacts): Penalty | null {
+  const sources: [NoiseSource, number][] = NOISE.map((n, cls) => [n, facts.roads[cls] as number]);
+  sources.push([RAIL_NOISE, facts.railMeters ?? Number.POSITIVE_INFINITY]);
   let best: Penalty | null = null;
-  NOISE.forEach((n, cls) => {
-    const d = facts.roads[cls] as number;
-    if (!(d < n.radius)) return;
+  for (const [n, d] of sources) {
+    if (!(d < n.radius)) continue;
     const points = n.cap * (1 - d / n.radius);
     if (!best || points > best.points) {
       const facts = [{ label: `距${n.name}`, value: `${Math.round(d)} m` }];
       best = { label: '交通噪声', points, facts, detail: joinFacts(facts) };
     }
-  });
+  }
   return best;
 }
 

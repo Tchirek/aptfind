@@ -104,6 +104,18 @@ export function roadDistances(
   return out;
 }
 
+/** 到最近一段铁路干线的距离（米）；maxMeters 以外记为无穷远 */
+export function railDistance(
+  rails: readonly Float64Array[],
+  x: number,
+  y: number,
+  maxMeters = 600,
+): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (const r of rails) best = Math.min(best, distanceToPolyline(x, y, r));
+  return best <= maxMeters ? best : Number.POSITIVE_INFINITY;
+}
+
 function ringArea(ring: Float64Array): number {
   let a = 0;
   const n = ring.length / 2;

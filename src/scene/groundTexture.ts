@@ -16,6 +16,9 @@ export const GROUND = '#eef1f5';
 const ROAD_MAJOR = '#cfd7e2';
 const ROAD_MINOR = '#dce3ec';
 const WATER = '#bfccd3';
+/** 铁路：地图通用的灰底白间断线 */
+const RAIL = '#a7b0bd';
+const RAIL_DASH = '#f7f9fb';
 const RESIDENTIAL_FILL = 'rgba(186, 200, 220, 0.22)';
 const SCHOOL_FILL = 'rgba(201, 211, 190, 0.32)';
 const BOUNDARY = 'rgba(90, 108, 135, 0.38)';
@@ -121,6 +124,24 @@ export function buildGroundTexture(d: District, size = 4096): GroundTextures {
       ctx.stroke();
     }
   }
+
+  // 铁路：压在道路上面（铁路多是高架或下穿道路的桥）
+  ctx.strokeStyle = RAIL;
+  ctx.lineWidth = 3.2 * sx;
+  ctx.lineCap = 'butt';
+  for (const r of d.rails) {
+    path(r, false);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = RAIL_DASH;
+  ctx.lineWidth = 1.4 * sx;
+  ctx.setLineDash([9 * sx, 9 * sx]);
+  for (const r of d.rails) {
+    path(r, false);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.lineCap = 'round';
 
   // 小区边界：OSM 的用实线，推算的用虚线；校园加粗
   for (const c of d.compounds) {

@@ -11,7 +11,7 @@ import { floorsOf, type WindowGrid, wallAzimuth } from '../engine/geometry';
 import type { Entrance } from '../engine/isochrone';
 import { type Livability, scoreLivability } from '../engine/livability';
 import type { MetroGraph } from '../engine/metro';
-import { builtCoverage, greenDistance, roadDistances } from '../engine/site';
+import { builtCoverage, greenDistance, railDistance, roadDistances } from '../engine/site';
 import type { SunlightEngine } from '../engine/sunlight';
 import { viewFrom } from '../engine/view';
 import {
@@ -241,6 +241,7 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
     greenMeters: greenDistance(ctx.district, x, y),
     coverage: builtCoverage(ctx.district, x, y),
     roads: roadDistances(ctx.district.roads, x, y),
+    railMeters: railDistance(ctx.district.rails, x, y),
     floors: floorsOf(b.height),
     floorsEstimated: b.source === 'cbmf' || b.source === 'plan',
     builtYear: builtYearOf(ctx.district, b.compound),

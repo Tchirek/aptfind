@@ -138,6 +138,8 @@ export interface District {
   pois: Poi[];
   /** 划片表里的公办小学；可能在片区外，不混进 pois（那边是地图标注与可达范围用的） */
   schools: Poi[];
+  /** 铁路干线（不含隧道里的与站线、专用线），算噪声、画底图用 */
+  rails: Float64Array[];
 }
 
 interface DistrictJson {
@@ -185,6 +187,7 @@ interface DistrictJson {
   water: ({ r: number[] } | { l: number[]; w: number })[];
   pois: { n: string; c: PoiCategory; p: [number, number] }[];
   schools?: { n: string; p: [number, number] }[];
+  rails?: number[][];
 }
 
 const DM = 0.1;
@@ -254,6 +257,7 @@ export function decodeDistrict(json: DistrictJson): District {
       x: s.p[0] * DM,
       y: s.p[1] * DM,
     })),
+    rails: (json.rails ?? []).map(decode),
   };
 }
 
