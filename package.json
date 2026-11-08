@@ -1,7 +1,7 @@
 {
   "name": "aptfind",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "aptfind：成都狮子山片区逐窗日照、可达范围与宜居分析",
   "type": "module",
   "scripts": {
