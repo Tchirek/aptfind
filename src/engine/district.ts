@@ -61,6 +61,9 @@ export interface Compound {
   primarySchool: number;
   /** 二手房价（元/㎡，2026 年 11 月读取）：几期合在一块地的给区间；查不到为 null */
   price: { low: number; high: number; source: string } | null;
+  /** 整租月租金（元/㎡）、挂牌均价近一年涨跌（%）；查不到为 null */
+  rent: number | null;
+  yoy: number | null;
   rings: Float64Array[];
 }
 
@@ -107,6 +110,11 @@ export interface Poi {
   y: number;
 }
 
+/** 划片表里的公办小学；group 是校名上写明的教育集团 */
+export interface School extends Poi {
+  group: string | null;
+}
+
 /** 规则网格地形：z[j·nx + i] 是 (x0 + i·step, y0 + j·step) 处的地面高程 */
 export interface Terrain {
   x0: number;
@@ -139,7 +147,7 @@ export interface District {
   water: Water[];
   pois: Poi[];
   /** 划片表里的公办小学；可能在片区外，不混进 pois（那边是地图标注与可达范围用的） */
-  schools: Poi[];
+  schools: School[];
   /** 铁路干线（不含隧道里的与站线、专用线），算噪声、画底图用 */
   rails: Float64Array[];
 }
@@ -173,6 +181,8 @@ interface DistrictJson {
     ps?: number;
     pv?: [number, number];
     pk?: string;
+    rv?: number;
+    yo?: number;
     r: number[][];
   }[];
   buildings: {
@@ -190,7 +200,7 @@ interface DistrictJson {
   roads: { n: string | null; c: number; b: 0 | 1; l?: number; o?: -1 | 1; p: number[] }[];
   water: ({ r: number[] } | { l: number[]; w: number })[];
   pois: { n: string; c: PoiCategory; p: [number, number] }[];
-  schools?: { n: string; p: [number, number] }[];
+  schools?: { n: string; p: [number, number]; g?: string }[];
   rails?: number[][];
 }
 
@@ -227,6 +237,8 @@ export function decodeDistrict(json: DistrictJson): District {
       propertyCompany: c.pm ?? null,
       primarySchool: c.ps ?? -1,
       price: c.pv ? { low: c.pv[0], high: c.pv[1], source: c.pk ?? '' } : null,
+      rent: c.rv ?? null,
+      yoy: c.yo ?? null,
       rings: c.r.map(decode),
     })),
     buildings: json.buildings.map((b, index) => ({
@@ -261,6 +273,7 @@ export function decodeDistrict(json: DistrictJson): District {
       category: 'school' as const,
       x: s.p[0] * DM,
       y: s.p[1] * DM,
+      group: s.g ?? null,
     })),
     rails: (json.rails ?? []).map(decode),
   };

@@ -330,7 +330,7 @@ def load_schools(compound_names: set[str]) -> tuple[list[dict], dict[str, int]]:
             raise SystemExit(f"高德地点里没有 {row['amap_poi']}，先在 tools/amap.html 跑 schools()")
         x, y = xy_local(*amap.parse_location(hit["location"]))
         index[row["name"]] = len(schools)
-        schools.append({"n": row["short"], "p": [dm(float(x)), dm(float(y))]})
+        schools.append({"n": row["short"], "p": [dm(float(x)), dm(float(y))], **({"g": row["group"]} if row.get("group") else {})})
     catchment: dict[str, int] = {}
     with SCHOOL_CATCHMENT.open(encoding="utf-8") as f:
         for row in csv.DictReader(f):
@@ -958,6 +958,12 @@ def main() -> None:
                 **({"pm": info[c["name"]]["property_company"]} if info.get(c["name"], {}).get("property_company") else {}),
                 # 二手房价（元/㎡）：[低, 高]，单一价两端相同；来源平台写进 pk（2026-11 读取）
                 **(price_of(info[c["name"]]) if info.get(c["name"], {}).get("price") else {}),
+                # 整租月租金（元/㎡）、挂牌均价近一年涨跌（%）
+                **{
+                    key: float(info[c["name"]][col])
+                    for key, col in (("rv", "rent"), ("yo", "yoy"))
+                    if info.get(c["name"], {}).get(col)
+                },
                 **({"ps": catchment[c["name"]]} if c["name"] in catchment else {}),
             }
             for c in compounds
