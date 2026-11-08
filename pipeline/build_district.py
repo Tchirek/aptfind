@@ -186,6 +186,34 @@ out geom tags;
     )
 
 
+def fetch_osm_rail(b: Bounds) -> dict:
+    """铁路干线（算噪声用）：片区外再扩约 300 m，紧挨边界外的铁路也算得到"""
+    q = b.expand(0.003).overpass
+    return overpass(
+        f"""
+[out:json][timeout:120];
+(
+  way["railway"="rail"]({q});
+);
+out geom tags;
+""",
+        RAW / "osm-rail.json",
+    )
+
+
+def rail_lines(elements: list[dict], near: Polygon) -> list[LineString]:
+    """铁路干线：不要隧道里的，也不要站线、专用线、调车线（service=siding/spur/yard），车少声小"""
+    out: list[LineString] = []
+    for el in elements:
+        tags = el.get("tags", {})
+        if el["type"] != "way" or tags.get("service") or tags.get("tunnel") in ("yes", "building_passage"):
+            continue
+        line = to_local(LineString(way_coords(el)))
+        if line.intersects(near):
+            out.append(line.simplify(1.0))
+    return out
+
+
 def fetch_osm_metro(b: Bounds) -> dict:
     q = b.expand(0.004).overpass
     return overpass(
@@ -429,6 +457,7 @@ def main() -> None:
 
     elements = fetch_osm(outer)["elements"]
     metro_nodes = fetch_osm_metro(outer)["elements"]
+    rails = rail_lines(fetch_osm_rail(outer)["elements"], outer_local.buffer(300))
 
     # ---------------- 水系
     water_polys: list[Polygon] = []
@@ -723,6 +752,7 @@ def main() -> None:
         osm_levels += [(p, levels) for p in explode_polygons(to_local(g) if g is not None else None)]
     level_tree = STRtree([p for p, _ in osm_levels]) if osm_levels else None
     raised: Counter = Counter()
+    annex: Counter = Counter()
     for b in buildings:
         if level_tree is None or b["src"] == "survey":
             continue
@@ -753,7 +783,14 @@ def main() -> None:
             continue
         foot = sum(b["poly"].area for b in towers)
         cap = int(row["max_floors"]) if row.get("max_floors") else DEFAULT_MAX_FLOORS
-        gfa = int(row["households"]) * GFA_PER_HOUSEHOLD if row.get("households") else float(row["far"]) * site
+        # 总建筑面积：平台写了就用；否则按户数 × 每户面积，再不行按容积率 × 地块面积
+        # （地块边界常比平台的小区小，容积率一路最不可靠）
+        if row.get("gfa"):
+            gfa, basis = float(row["gfa"]), "建筑面积"
+        elif row.get("households"):
+            gfa, basis = int(row["households"]) * GFA_PER_HOUSEHOLD, "户数"
+        else:
+            gfa, basis = float(row["far"]) * site, "容积率"
         floors = max(1, min(cap, round(gfa / foot)))
         for b in towers:
             if floors > b["floors"]:
@@ -761,13 +798,21 @@ def main() -> None:
                 b["height"] = floors * FLOOR_HEIGHT
                 b["src"] = "plan"
                 raised["容积率推算"] += 1
-        print(f"  楼高校正 {names[0]}：{'户数' if row.get('households') else '容积率'}，{len(towers)} 栋塔楼足迹 {foot:.0f} m² → {floors} 层", file=sys.stderr)
+        # 楼栋数是平台给的全部楼栋，已由塔楼占满；地块里剩下足迹不到 250 m² 的"住宅"是门厅、会所、
+        # 设备房、车库出入口之类，不算住房（不评分、屋顶不着色），仍按原样参与遮挡
+        tower_ids = {id(b) for b in towers}
+        for b in buildings:
+            if b["compound"] in ks and b["cls"] == "R" and id(b) not in tower_ids and b["poly"].area < 250:
+                b["cls"] = "U"
+                annex[names[0]] += 1
+        print(f"  楼高校正 {names[0]}：{basis}，{len(towers)} 栋塔楼足迹 {foot:.0f} m² → {floors} 层", file=sys.stderr)
         if row.get("built_year"):
             for n in names:
                 info.setdefault(n, {"name": n, "built_year": "", "note": ""})
                 if not info[n].get("built_year"):
                     info[n]["built_year"] = row["built_year"]
     print(f"  楼高校正：{dict(raised)}", file=sys.stderr)
+    print(f"  高层小区里的附属小楼（不算住宅）：{sum(annex.values())} 栋 {dict(annex)}", file=sys.stderr)
 
     # ---------------- 设施
     pois: list[dict] = []
@@ -866,7 +911,7 @@ def main() -> None:
         "建筑：CBMF（Zheng et al., 2026, doi:10.5281/zenodo.18595960, CC BY 4.0），高度源自 3D-GloBFP；"
         "高层住宅的层数按 OSM 标注与房天下、链家等公开的小区楼栋数、户数、容积率校正",
         terrain.ATTRIBUTION,
-        "道路、步行网、地铁线路、边界、水系：© OpenStreetMap contributors（ODbL）",
+        "道路、铁路、步行网、地铁线路、边界、水系：© OpenStreetMap contributors（ODbL）",
     ]
     if regeo or pois:
         attribution.append(amap.ATTRIBUTION)
@@ -925,6 +970,7 @@ def main() -> None:
         ],
         "roads": roads,
         "water": water,
+        "rails": [line_dm(l.coords) for l in rails],
         "pois": pois,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
