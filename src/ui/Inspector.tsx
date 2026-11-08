@@ -9,7 +9,7 @@ import { type Building, CLASS_LABEL, type District } from '../engine/district';
 import { floorsOf } from '../engine/geometry';
 import { AWAY, LIT, type Span, SunPath, TERRAIN } from '../engine/sunlight';
 import { AccessSection } from './AccessSection';
-import { LandPriceSection } from './LandPriceSection';
+import { estatePrice, LandPriceSection } from './LandPriceSection';
 import { LivabilitySection } from './LivabilitySection';
 import { THRESHOLD_MINUTES, warmSpanFor } from './palette';
 import { ReachSection } from './ReachSection';
@@ -293,7 +293,7 @@ function WindowDetail({ data, index }: { data: SceneData; index: number }) {
       <ViewSection data={data} index={index} />
       <ReachSection building={b.index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
-      <LandPriceSection />
+      <LandPriceSection price={estatePrice(d, b.compound)} />
 
       <section className="note">
         <p>{heightNote(b)}</p>
@@ -336,7 +336,7 @@ function BuildingDetail({ data, index }: { data: SceneData; index: number }) {
         </section>
       )}
       <LivabilitySection building={index} />
-      <LandPriceSection />
+      <LandPriceSection price={estatePrice(d, b.compound)} />
       <ReachSection building={index} />
       <AccessSection ring={b.rings[0] as Float64Array} />
     </Frame>
@@ -385,7 +385,7 @@ function CompoundDetail({ data, index }: { data: SceneData; index: number }) {
         </section>
       )}
       <AccessSection ring={largest} />
-      <LandPriceSection />
+      <LandPriceSection price={estatePrice(d, index)} />
     </Frame>
   );
 }
