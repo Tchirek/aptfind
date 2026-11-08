@@ -197,7 +197,10 @@ for (const b of district.buildings) {
   if (b.core && b.cls === 'R') facts.set(b.index, livabilityFacts(ctx, b.index));
 }
 const estates = district.compounds
-  .map((c, k) => ({ c, bs: district.buildings.filter((b) => b.compound === k && facts.get(b.index)) }))
+  .map((c, k) => ({
+    c,
+    bs: district.buildings.filter((b) => b.compound === k && facts.get(b.index)),
+  }))
   .filter((e) => e.c.kind === 'residential' && e.bs.length >= 3);
 for (const key of PROFILE_KEYS) {
   const scored = estates
