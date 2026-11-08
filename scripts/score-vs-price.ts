@@ -7,11 +7,13 @@
  */
 import { readFileSync } from 'node:fs';
 import { allEntrances } from '../src/app/entrances';
-import { livabilityOf } from '../src/app/livabilityFacts';
+import { livabilityFacts, livabilityOf } from '../src/app/livabilityFacts';
 import { Barriers, barrierSegments } from '../src/engine/barriers';
 import { decodeDistrict } from '../src/engine/district';
 import { buildSolids, buildWindowGrid } from '../src/engine/geometry';
+import { type LivabilityFacts, scoreLivability } from '../src/engine/livability';
 import { MetroGraph } from '../src/engine/metro';
+import { PROFILE_KEYS, PROFILES } from '../src/engine/profiles';
 import { decodeRegion, stationLines } from '../src/engine/region';
 import { SunlightEngine } from '../src/engine/sunlight';
 import { snapPois, WalkGraph } from '../src/engine/walk';
@@ -188,3 +190,45 @@ for (const k of Object.keys(rows[0]?.dims ?? {})) {
     ).toFixed(2)}`,
   );
 }
+
+// ---------------- 各视角：小区榜首榜尾（核心区住宅楼 3 栋以上的地块，取中位数）
+const facts = new Map<number, ReturnType<typeof livabilityFacts>>();
+for (const b of district.buildings) {
+  if (b.core && b.cls === 'R') facts.set(b.index, livabilityFacts(ctx, b.index));
+}
+const estates = district.compounds
+  .map((c, k) => ({ c, bs: district.buildings.filter((b) => b.compound === k && facts.get(b.index)) }))
+  .filter((e) => e.c.kind === 'residential' && e.bs.length >= 3);
+for (const key of PROFILE_KEYS) {
+  const scored = estates
+    .map((e) => ({
+      name: e.c.name,
+      price: e.c.price ? (e.c.price.low + e.c.price.high) / 2 : null,
+      total: median(
+        e.bs
+          .map((b) => scoreLivability(facts.get(b.index) as LivabilityFacts, key).total)
+          .filter((t) => t >= 0),
+      ),
+    }))
+    .filter((e) => Number.isFinite(e.total))
+    .sort((a, b) => b.total - a.total);
+  const fmt = (e: { name: string; total: number }) => `${e.name} ${e.total}`;
+  const priced = scored.filter((e) => e.price !== null);
+  const rho = spearman(
+    priced.map((e) => e.total),
+    priced.map((e) => e.price as number),
+  );
+  console.log(`\n【${PROFILES[key].label}】${scored.length} 个小区，与房价 ρ = ${rho.toFixed(2)}`);
+  console.log(`  高：${scored.slice(0, 7).map(fmt).join('，')}`);
+  console.log(`  低：${scored.slice(-7).map(fmt).join('，')}`);
+}
+
+const commute = [...facts.values()]
+  .flatMap((f) => (f?.hubs ? [f.hubs.reduce((sum, h) => sum + h.minutes, 0) / f.hubs.length] : []))
+  .filter(Number.isFinite)
+  .sort((a, b) => a - b);
+const at = (p: number) => Math.round(commute[Math.floor(p * (commute.length - 1))] as number);
+console.log(
+  `\n通勤（三个就业中心的平均门到门分钟）：最快 ${at(0)} · 5% ${at(0.05)} · 25% ${at(0.25)} · ` +
+    `中位 ${at(0.5)} · 75% ${at(0.75)} · 95% ${at(0.95)} · 最慢 ${at(1)}`,
+);
