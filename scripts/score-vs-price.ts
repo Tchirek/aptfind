@@ -1,7 +1,9 @@
 /**
- * 宜居评分与二手房均价对拍：各小区住宅楼的评分中位数，与公开挂牌均价的秩相关。
- * 均价取自安居客、房天下、链家的小区页（口径与日期不一，只用来看排序）。
+ * 宜居评分与二手房均价对拍：各小区住宅楼的评分中位数，与房天下"小区参考价"的秩相关。
+ * 价格统一取房天下小区页（2026-11-08 读取），只看排序。
+ * 同一项目分成几块地的（如华润幸福里），合成一个样本，价格取各期均值。
  * 用法：npx tsx scripts/score-vs-price.ts
+ *      DETAIL=教育 npx tsx scripts/score-vs-price.ts   另列出各小区该维度的依据（取总分居中的那栋楼）
  */
 import { readFileSync } from 'node:fs';
 import { allEntrances } from '../src/app/entrances';
@@ -14,24 +16,36 @@ import { decodeRegion, stationLines } from '../src/engine/region';
 import { SunlightEngine } from '../src/engine/sunlight';
 import { snapPois, WalkGraph } from '../src/engine/walk';
 
-/** 元/㎡；多个平台时取近期主流的中间值 */
+/** 元/㎡；键是地块名，同一项目的几块地用 | 连起来 */
 export const PRICES: Record<string, number> = {
-  万科·城市花园: 28000,
-  华润幸福里2期: 26900,
-  比华利国际城3期: 25550,
-  万科金润华府: 25200,
-  比华利国际城2期: 22900,
-  华润·凯旋天地: 21000,
-  望江锦园: 19900,
-  比华利国际城1期: 19200,
-  锦江国际花园: 18100,
-  沙河壹号2期: 17600,
-  校园春天: 17400,
-  蓝谷地A区: 17200,
-  城东雅郡: 16800,
-  海桐一期: 13900,
-  嘉和园一期: 12400,
-  嘉和园二期: 12450,
+  新希望锦官阁: 27494,
+  万科·城市花园: 25880,
+  '华润幸福里2期|华润·幸福里1期|华润·幸福里': 23771,
+  比华利国际城3期: 22656,
+  万科金润华府: 22219,
+  比华利国际城2期: 21064,
+  自在轩: 20659,
+  华润·凯旋天地: 19995,
+  望江锦园: 18882,
+  城东雅郡: 18614,
+  比华利国际城1期: 17534,
+  '沙河壹号|沙河壹号1期|沙河壹号2期': 17510,
+  爱丁郡院: 17385,
+  校园春天: 16683,
+  锦江国际花园: 16305,
+  卓锦城2期: 16173,
+  华固一品: 15956,
+  蓝谷地天域: 15442,
+  蓝谷地C区: 15064,
+  蓝谷地A区: 14499,
+  海桐三期: 13175,
+  '海桐一期|海桐小区一期': 12991,
+  上东锦城B区: 12971,
+  辉煌佳苑: 12255,
+  东方丽景: 12016,
+  '嘉和园|嘉和园一期|嘉和园二期|嘉和园西区': 11874,
+  '大观苑-一期': 11568,
+  '大观苑-二期': 11124,
 };
 
 const DATA = new URL('../public/data/', import.meta.url);
@@ -107,10 +121,13 @@ const rows: {
   total: number;
   noQuality: number;
   dims: Record<string, number>;
+  detail: string;
 }[] = [];
 for (const [name, price] of Object.entries(PRICES)) {
-  const k = district.compounds.findIndex((c) => c.name === name);
-  const bs = district.buildings.filter((b) => b.compound === k && b.core && b.cls === 'R');
+  const names = new Set(name.split('|'));
+  const ks = new Set(district.compounds.flatMap((c, k) => (names.has(c.name) ? [k] : [])));
+  if (ks.size !== names.size) throw new Error(`找不到地块：${name}`);
+  const bs = district.buildings.filter((b) => ks.has(b.compound) && b.core && b.cls === 'R');
   if (!bs.length) {
     console.log(`  （${name} 没有核心区住宅楼，跳过）`);
     continue;
@@ -118,16 +135,23 @@ for (const [name, price] of Object.entries(PRICES)) {
   const totals: number[] = [];
   const noQuality: number[] = [];
   const dims: Record<string, number[]> = {};
+  const details: [number, string][] = [];
   for (const b of bs) {
     const l = livabilityOf(ctx, b.index);
     if (!l) continue;
     totals.push(l.total);
+    const shown = l.dimensions.find((d) => d.label === process.env.DETAIL);
+    if (shown) details.push([l.total, `${shown.score.toFixed(1)}/${shown.max}  ${shown.detail}`]);
     // 去掉"物业与小区"一项、其余照常归一：看物理与区位那几项本身和房价对不对得上
     const rest = l.dimensions.filter((d) => d.key !== 'quality');
     const earned = rest.reduce((sum, d) => sum + d.score, 0);
     const possible = rest.reduce((sum, d) => sum + d.max, 0);
     noQuality.push((earned / possible) * 100 - l.penalties.reduce((sum, p) => sum + p.points, 0));
-    for (const d of l.dimensions) (dims[d.label] ??= []).push(d.score / d.max);
+    for (const d of l.dimensions) {
+      const list = dims[d.label] ?? [];
+      list.push(d.score / d.max);
+      dims[d.label] = list;
+    }
   }
   rows.push({
     name,
@@ -135,11 +159,14 @@ for (const [name, price] of Object.entries(PRICES)) {
     total: median(totals),
     noQuality: median(noQuality),
     dims: Object.fromEntries(Object.entries(dims).map(([k2, v]) => [k2, median(v)])),
+    detail: details.sort((a, b) => a[0] - b[0])[Math.floor(details.length / 2)]?.[1] ?? '',
   });
 }
 rows.sort((a, b) => b.price - a.price);
 for (const r of rows)
-  console.log(`${r.name.padEnd(10)} ${String(r.price).padStart(6)}  评分 ${r.total}`);
+  console.log(
+    `${(r.name.split('|')[0] as string).padEnd(10)} ${String(r.price).padStart(6)}  评分 ${r.total}  ${r.detail}`,
+  );
 const prices = rows.map((r) => r.price);
 console.log(
   `\n${rows.length} 个小区，总分与均价的秩相关 ρ = ${spearman(
