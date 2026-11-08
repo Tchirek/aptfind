@@ -11,8 +11,13 @@
  * 数据全部来自前面几节：逐窗日照、步行与地铁可达、视野、场地与楼宇。
  */
 
+import { PROFILES, type Profile, type ProfileKey } from './profiles';
+
 /** 大寒日日照标准（分钟） */
 const SUNLIGHT_THRESHOLD = 120;
+
+/** 5 年期以上 LPR（2026-10-20 公布）：投资回报拿它做对照，买房贷款的成本 */
+export const MORTGAGE_RATE = 3.5;
 
 /** log10(v+1) / log10(fullAt+1)，在 fullAt 处归一为 1 */
 export function logRatio(value: number, fullAt: number): number {
@@ -46,7 +51,20 @@ export interface Fact {
 }
 
 export interface Dimension {
-  key: 'light' | 'transit' | 'amenity' | 'education' | 'environment' | 'building' | 'quality';
+  key:
+    | 'light'
+    | 'transit'
+    | 'amenity'
+    | 'education'
+    | 'environment'
+    | 'building'
+    | 'quality'
+    | 'commute'
+    | 'rent'
+    | 'price'
+    | 'quiet'
+    | 'schoolGroup'
+    | 'returns';
   label: string;
   score: number;
   max: number;
@@ -93,6 +111,8 @@ export interface LivabilityFacts {
   primaryMinutes: number;
   /** 对口公办小学（按划片）；没查到划片时为空，primaryMinutes 是最近一所公办小学 */
   primarySchool?: string | null;
+  /** 对口小学所属的教育集团（校名上写明的），独立办学为空 */
+  schoolGroup?: string | null;
   middleMinutes: number;
   /** 步行 10 分钟内各类设施的家数 */
   within10: {
@@ -120,6 +140,12 @@ export interface LivabilityFacts {
   builtYear: number | null;
   /** 楼外 30 m 内的餐饮家数：底商的油烟、夜宵噪声 */
   foodAdjacent: number;
+  /** 楼周 150 m 内的餐饮家数：比楼下一排更大一圈的"热闹程度" */
+  foodNear?: number;
+  /** 走到地铁再坐到主要就业中心的分钟数，到不了为 Infinity */
+  hubs?: readonly { name: string; minutes: number }[];
+  /** 小区二手房价（元/㎡）、整租月租金（元/㎡）、挂牌均价近一年涨跌（%）；查不到为 null */
+  market?: { price: number | null; rent: number | null; yoy: number | null };
   /** 小区的公开指标：物业费（元/㎡·月）、绿化率（%）、容积率、物业公司；查不到为 null */
   property: {
     fee: number | null;
@@ -138,7 +164,13 @@ export interface Livability {
   penalties: Penalty[];
   /** 一句话的依据摘要，由规则生成 */
   summary: string;
+  /** 这个视角缺关键数据、算不出分数；此时 total 为 −1 */
+  unavailable?: boolean;
 }
+
+/** 三个就业中心的平均门到门时间：片区 5% 与 95% 分位（29、44 分钟）附近 */
+const COMMUTE_GOOD = 28;
+const COMMUTE_FAIR = 46;
 
 const MAX = {
   light: 22,
@@ -349,6 +381,111 @@ function qualityDimension(facts: LivabilityFacts): Dimension {
   ]);
 }
 
+/** 通勤：门到门坐地铁去几个主要就业中心的平均时间（含走路、进站候车、换乘、出站） */
+function commuteDimension(facts: LivabilityFacts): Dimension | null {
+  const hubs = facts.hubs?.filter((h) => Number.isFinite(h.minutes));
+  if (!hubs?.length) return null;
+  const mean = hubs.reduce((sum, h) => sum + h.minutes, 0) / hubs.length;
+  return dimension(
+    'commute',
+    '通勤',
+    10 * nearBy(mean, COMMUTE_GOOD, COMMUTE_FAIR),
+    10,
+    hubs.map((h) => ({ label: h.name, value: `${Math.round(h.minutes)} 分钟` })),
+  );
+}
+
+/** 房租：按月租金（元/㎡），顺带折成常见的 70 ㎡ 两居 */
+function rentDimension(facts: LivabilityFacts): Dimension | null {
+  const rent = facts.market?.rent;
+  if (rent === null || rent === undefined) return null;
+  return dimension('rent', '房租', 10 * nearBy(rent, 28, 55), 10, [
+    { label: '月租', value: `${rent} 元/㎡` },
+    { label: '70 ㎡ 约', value: `${Math.round((rent * 70) / 100) * 100} 元` },
+  ]);
+}
+
+/** 房价：对躺平的人，买得便宜就是最大的自由 */
+function priceDimension(facts: LivabilityFacts): Dimension | null {
+  const price = facts.market?.price;
+  if (price === null || price === undefined) return null;
+  return dimension('price', '房价', 10 * nearBy(price, 11000, 30000), 10, [
+    { label: '房价', value: `${(price / 10000).toFixed(2)} 万/㎡` },
+    { label: '90 ㎡ 约', value: `${Math.round((price * 90) / 10000)} 万` },
+  ]);
+}
+
+/** 清静：离干道和铁路远，楼下与楼周没有成片的饭馆 */
+function quietDimension(facts: LivabilityFacts): Dimension {
+  let loud = 0;
+  const sources: [NoiseSource, number][] = NOISE.map((n, cls) => [n, facts.roads[cls] as number]);
+  sources.push([RAIL_NOISE, facts.railMeters ?? Number.POSITIVE_INFINITY]);
+  for (const [n, d] of sources) {
+    if (d < n.radius) loud = Math.max(loud, (n.cap / 8) * (1 - d / n.radius));
+  }
+  const near = facts.foodNear ?? 0;
+  const road = Math.min(...facts.roads);
+  const rail = facts.railMeters ?? Number.POSITIVE_INFINITY;
+  const far = (m: number) => (Number.isFinite(m) && m <= 600 ? `${Math.round(m)} m` : '600 m 外');
+  return dimension(
+    'quiet',
+    '清静',
+    5.5 * (1 - loud) + 2.5 * nearBy(near, 3, 40) + 2 * nearBy(facts.foodAdjacent, 0, 4),
+    10,
+    [
+      { label: '最近干道', value: far(road) },
+      { label: '铁路', value: far(rail) },
+      { label: '150 m 餐饮', value: `${near} 家` },
+      { label: '楼下餐饮', value: `${facts.foodAdjacent} 家` },
+    ],
+  );
+}
+
+/**
+ * 对口校：校名上写明属于哪个教育集团是公开事实，比口碑可查。
+ * 集团校不等于教得好，只是家长和房价都认这块牌子，所以只进"子女上学"这一个视角。
+ */
+function schoolGroupDimension(facts: LivabilityFacts): Dimension {
+  // 查不到划片的按独立办学算：缺数据不能比查到了的占便宜
+  const value = facts.schoolGroup ?? (facts.primarySchool ? '独立办学' : '未查到划片');
+  return dimension('schoolGroup', '对口校', facts.schoolGroup ? 10 : 4, 10, [
+    { label: '教育集团', value, wide: true },
+  ]);
+}
+
+/**
+ * 投资回报：一年的租金回报加价格涨跌。0 以下是亏的，
+ * 等于房贷利率（72 分）才算把利息挣回来。
+ */
+function returnsDimension(facts: LivabilityFacts): Dimension | null {
+  const m = facts.market;
+  if (!m || m.price === null || m.rent === null || m.yoy === null) return null;
+  const rentYield = ((m.rent * 12) / m.price) * 100;
+  const annual = rentYield + m.yoy;
+  const points: [number, number][] = [
+    [-10, 0],
+    [0, 40],
+    [MORTGAGE_RATE, 72],
+    [8, 100],
+  ];
+  let ratio = annual <= -10 ? 0 : 1;
+  for (let i = 1; i < points.length && annual > -10; i++) {
+    const [x0, y0] = points[i - 1] as [number, number];
+    const [x1, y1] = points[i] as [number, number];
+    if (annual <= x1) {
+      ratio = (y0 + ((annual - x0) / (x1 - x0)) * (y1 - y0)) / 100;
+      break;
+    }
+  }
+  const pct = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
+  return dimension('returns', '持有回报', 10 * ratio, 10, [
+    { label: '租金回报', value: `${rentYield.toFixed(1)}%` },
+    { label: '近一年', value: pct(m.yoy) },
+    { label: '合计', value: pct(annual) },
+    { label: '房贷利率', value: `${MORTGAGE_RATE}%` },
+  ]);
+}
+
 /** 底商：楼外 30 m 内两家以上餐饮开始扣，八家以上扣满 */
 function adjacentFoodPenalty(facts: LivabilityFacts): Penalty | null {
   const n = facts.foodAdjacent;
@@ -391,21 +528,57 @@ function noisePenalty(facts: LivabilityFacts): Penalty | null {
   return best;
 }
 
-/** 各项分数按实际给出的维度归一：不在日照计算范围内的楼没有采光一项 */
-export function scoreLivability(facts: LivabilityFacts): Livability {
-  const dimensions = [
-    lightDimension(facts),
-    transitDimension(facts),
-    amenityDimension(facts),
-    educationDimension(facts),
-    environmentDimension(facts),
-    buildingDimension(facts),
-    qualityDimension(facts),
-  ].filter((d): d is Dimension => d !== null);
+/** 各维度按视角的权重重新换算；算不出来的维度（没有窗位、没有房价）不计入，其余归一 */
+function weightedDimensions(facts: LivabilityFacts, profile: Profile): Dimension[] {
+  const built: Record<Dimension['key'], () => Dimension | null> = {
+    light: () => lightDimension(facts),
+    transit: () => transitDimension(facts),
+    amenity: () => amenityDimension(facts),
+    education: () => educationDimension(facts),
+    environment: () => environmentDimension(facts),
+    building: () => buildingDimension(facts),
+    quality: () => qualityDimension(facts),
+    commute: () => commuteDimension(facts),
+    rent: () => rentDimension(facts),
+    price: () => priceDimension(facts),
+    quiet: () => quietDimension(facts),
+    schoolGroup: () => schoolGroupDimension(facts),
+    returns: () => returnsDimension(facts),
+  };
+  const out: Dimension[] = [];
+  for (const [key, weight] of Object.entries(profile.weights) as [Dimension['key'], number][]) {
+    const d = built[key]();
+    if (d) out.push({ ...d, score: (d.score / d.max) * weight, max: weight });
+  }
+  return out;
+}
 
-  const penalties = [noisePenalty(facts), adjacentFoodPenalty(facts)].filter(
-    (p): p is Penalty => p !== null,
-  );
+function scaled(p: Penalty | null, k: number): Penalty | null {
+  return p && k > 0 ? { ...p, points: p.points * k } : null;
+}
+
+export function scoreLivability(
+  facts: LivabilityFacts,
+  profileKey: ProfileKey = 'balanced',
+): Livability {
+  const profile = PROFILES[profileKey];
+  const dimensions = weightedDimensions(facts, profile);
+  if (profile.requires && !dimensions.some((d) => d.key === profile.requires)) {
+    return {
+      total: -1,
+      tone: 'fair',
+      label: '无数据',
+      dimensions: [],
+      penalties: [],
+      summary: '这个小区查不到房价或租金，算不出回报',
+      unavailable: true,
+    };
+  }
+
+  const penalties = [
+    scaled(noisePenalty(facts), profile.noise),
+    scaled(adjacentFoodPenalty(facts), profile.food),
+  ].filter((p): p is Penalty => p !== null);
   const earned = dimensions.reduce((sum, d) => sum + d.score, 0);
   const possible = dimensions.reduce((sum, d) => sum + d.max, 0);
   const deducted = penalties.reduce((sum, p) => sum + p.points, 0);
@@ -415,7 +588,14 @@ export function scoreLivability(facts: LivabilityFacts): Livability {
   const label = grade ? grade[1] : '较差';
   const tone: Tone = grade ? grade[2] : 'poor';
 
-  return { total, tone, label, dimensions, penalties, summary: summarize(dimensions, penalties) };
+  return {
+    total,
+    tone,
+    label,
+    dimensions,
+    penalties,
+    summary: summarize(dimensions, penalties, profile),
+  };
 }
 
 const STRONG: Record<Dimension['key'], string> = {
@@ -426,6 +606,12 @@ const STRONG: Record<Dimension['key'], string> = {
   environment: '环境开阔',
   building: '楼新有电梯',
   quality: '物业好',
+  commute: '上班快',
+  rent: '房租低',
+  price: '房价低',
+  quiet: '清静',
+  schoolGroup: '对口集团校',
+  returns: '回报不错',
 };
 
 const WEAK: Record<Dimension['key'], string> = {
@@ -436,9 +622,22 @@ const WEAK: Record<Dimension['key'], string> = {
   environment: '楼距偏密',
   building: '楼老或无电梯',
   quality: '物业一般',
+  commute: '上班远',
+  rent: '房租偏高',
+  price: '房价偏高',
+  quiet: '偏吵',
+  schoolGroup: '对口校独立办学',
+  returns: '回报偏低',
 };
 
-function summarize(dimensions: Dimension[], penalties: Penalty[]): string {
+function summarize(dimensions: Dimension[], penalties: Penalty[], profile: Profile): string {
+  const returns = dimensions.find((d) => d.key === 'returns');
+  if (profile.key === 'invest' && returns) {
+    const annual = returns.facts.find((f) => f.label === '合计')?.value ?? '';
+    return Number.parseFloat(annual) < MORTGAGE_RATE
+      ? `一年回报 ${annual}，跑不赢 ${MORTGAGE_RATE}% 的房贷`
+      : `一年回报 ${annual}，能覆盖房贷利率`;
+  }
   const ranked = [...dimensions].sort((a, b) => b.score / b.max - a.score / a.max);
   const best = ranked[0];
   const worst = ranked[ranked.length - 1];

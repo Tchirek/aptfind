@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type LivabilityFacts, logRatio, mainFacadeWindows, scoreLivability } from './livability';
+import { PROFILE_KEYS, PROFILES } from './profiles';
 
 const good: LivabilityFacts = {
   windows: [300, 320, 280, 260, 300, 320, 290, 310],
@@ -218,5 +219,79 @@ describe('铁路噪声', () => {
     const noise = r.penalties.filter((p) => p.label === '交通噪声');
     expect(noise).toHaveLength(1);
     expect(noise[0]?.facts[0]?.label).toBe('距快速路');
+  });
+});
+
+describe('看房视角', () => {
+  const market = { price: 20000, rent: 40, yoy: -8 };
+  const full: LivabilityFacts = {
+    ...good,
+    market,
+    foodNear: 5,
+    primarySchool: '菱窠路小学',
+    schoolGroup: null,
+    hubs: [
+      { name: '春熙路', minutes: 30 },
+      { name: '金融城', minutes: 40 },
+      { name: '孵化园', minutes: 50 },
+    ],
+  };
+
+  it('每个视角的权重加起来是 100', () => {
+    for (const key of PROFILE_KEYS) {
+      const sum = Object.values(PROFILES[key].weights).reduce((a, b) => a + b, 0);
+      expect(sum, key).toBe(100);
+    }
+  });
+
+  it('默认视角就是综合', () => {
+    expect(scoreLivability(full).total).toBe(scoreLivability(full, 'balanced').total);
+  });
+
+  it('上班租房只看地铁时间和房租这些，不看学校', () => {
+    const near = { ...full, hubs: full.hubs?.map((h) => ({ ...h, minutes: 25 })) };
+    const far = { ...full, hubs: full.hubs?.map((h) => ({ ...h, minutes: 60 })) };
+    expect(scoreLivability(near, 'commute').total).toBeGreaterThan(
+      scoreLivability(far, 'commute').total + 20,
+    );
+    const keys = scoreLivability(full, 'commute').dimensions.map((d) => d.key);
+    expect(keys).toContain('commute');
+    expect(keys).toContain('rent');
+    expect(keys).not.toContain('education');
+  });
+
+  it('子女上学：对口集团校比独立办学分高', () => {
+    const a = scoreLivability({ ...full, schoolGroup: '成师附小' }, 'family').total;
+    const b = scoreLivability(full, 'family').total;
+    expect(a).toBeGreaterThan(b);
+  });
+
+  it('清静：贴着干道比远离干道分低，噪声不再重复扣', () => {
+    const loud = scoreLivability({ ...full, roads: [20, 300, 300] }, 'quiet');
+    const calm = scoreLivability(full, 'quiet');
+    expect(calm.total).toBeGreaterThan(loud.total + 10);
+    expect(loud.penalties).toHaveLength(0);
+  });
+
+  it('躺平：同样的楼，便宜的分高', () => {
+    const cheap = { ...full, market: { ...market, price: 12000 } };
+    const dear = { ...full, market: { ...market, price: 28000 } };
+    expect(scoreLivability(cheap, 'leisure').total).toBeGreaterThan(
+      scoreLivability(dear, 'leisure').total,
+    );
+  });
+
+  it('投资：租金回报加涨跌跑不赢房贷就是低分，写明差多少', () => {
+    const r = scoreLivability(full, 'invest');
+    expect(r.total).toBeLessThan(35);
+    expect(r.summary).toContain('跑不赢');
+    const up = scoreLivability({ ...full, market: { ...market, yoy: 8 } }, 'invest');
+    expect(up.total).toBeGreaterThan(80);
+  });
+
+  it('投资：查不到房价或租金时不给分', () => {
+    const r = scoreLivability({ ...full, market: { ...market, rent: null } }, 'invest');
+    expect(r.unavailable).toBe(true);
+    expect(r.total).toBe(-1);
   });
 });

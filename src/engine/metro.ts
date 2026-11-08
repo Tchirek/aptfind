@@ -39,6 +39,7 @@ interface Edge {
 export class MetroGraph {
   readonly params: TripParams;
   readonly stationCount: number;
+  readonly stationNames: readonly string[];
   /** 状态 = (车站, 线路) */
   private readonly stateStation: number[] = [];
   private readonly statesAt: number[][];
@@ -47,6 +48,7 @@ export class MetroGraph {
   constructor(region: Region) {
     this.params = region.params;
     this.stationCount = region.stations.length;
+    this.stationNames = region.stations.map((s) => s.name);
     this.statesAt = region.stations.map(() => []);
     const ids = new Map<string, number>();
     const state = (station: number, line: number) => {

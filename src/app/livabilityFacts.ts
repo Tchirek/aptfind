@@ -9,8 +9,9 @@
 import type { District, Poi } from '../engine/district';
 import { floorsOf, type WindowGrid, wallAzimuth } from '../engine/geometry';
 import type { Entrance } from '../engine/isochrone';
-import { type Livability, scoreLivability } from '../engine/livability';
+import { type Livability, type LivabilityFacts, scoreLivability } from '../engine/livability';
 import type { MetroGraph } from '../engine/metro';
+import type { ProfileKey } from '../engine/profiles';
 import { builtCoverage, greenDistance, railDistance, roadDistances } from '../engine/site';
 import type { SunlightEngine } from '../engine/sunlight';
 import { viewFrom } from '../engine/view';
@@ -92,10 +93,11 @@ function primarySchoolOf(ctx: LivabilityContext, access: Access, compound: numbe
     const d = (access.paths.dist[assigned.node] as number) + assigned.snap;
     return {
       name: assigned.poi.name,
+      group: ctx.district.schools[k]?.group ?? null,
       minutes: Number.isFinite(d) ? minutesOf(d) : Number.POSITIVE_INFINITY,
     };
   }
-  return { name: null, minutes: nearestMinutes(access, schools, () => true) };
+  return { name: null, group: null, minutes: nearestMinutes(access, schools, () => true) };
 }
 
 /** 在已算好的步行最短路上，找满足条件的最近一处，返回分钟数 */
@@ -183,6 +185,45 @@ function propertyOf(d: District, compound: number) {
   };
 }
 
+/** 小区的房价（几期合并的取区间中点）、租金、涨跌；小区没有就看上级地块 */
+function marketOf(d: District, compound: number) {
+  const c = d.compounds[compound];
+  const parent = c && c.parent >= 0 ? d.compounds[c.parent] : undefined;
+  const price = c?.price ?? parent?.price ?? null;
+  return {
+    price: price ? (price.low + price.high) / 2 : null,
+    rent: c?.rent ?? parent?.rent ?? null,
+    yoy: c?.yoy ?? parent?.yoy ?? null,
+  };
+}
+
+/** 楼周 radius 米内的餐饮家数 */
+function foodWithin(d: District, x: number, y: number, radius = 150): number {
+  let n = 0;
+  for (const p of d.pois) {
+    if (p.category === 'food' && Math.hypot(p.x - x, p.y - y) <= radius) n++;
+  }
+  return n;
+}
+
+/** 片区上班族最常去的就业中心：春熙路商圈、金融城、高新南区 */
+const JOB_HUBS = ['春熙路', '金融城', '孵化园'] as const;
+
+/** 门到门坐地铁到各就业中心的分钟数：走到出入口 + 进站候车 + 乘车换乘 + 出站 */
+function hubMinutes(ctx: LivabilityContext, access: Access) {
+  const { board, exit } = ctx.metro.params;
+  const boards = new Float64Array(ctx.metro.stationCount).fill(Number.POSITIVE_INFINITY);
+  for (const e of ctx.entrances) {
+    const t = minutesOf((access.paths.dist[e.node] as number) + e.snap) + board;
+    if (t < (boards[e.station] as number)) boards[e.station] = t;
+  }
+  const { arrival } = ctx.metro.ride(boards, 120);
+  return JOB_HUBS.map((name) => {
+    const s = ctx.metro.stationNames.indexOf(name);
+    return { name, minutes: s < 0 ? Number.POSITIVE_INFINITY : (arrival[s] as number) + exit };
+  });
+}
+
 /** 步行 15 分钟内能走到出入口的车站，一共经过几条不同的线 */
 function linesWithinWalk(ctx: LivabilityContext, access: Access, minutes = 15): number {
   const lines = new Set<number>();
@@ -194,7 +235,7 @@ function linesWithinWalk(ctx: LivabilityContext, access: Access, minutes = 15): 
   return lines.size;
 }
 
-export function livabilityOf(ctx: LivabilityContext, building: number): Livability | null {
+export function livabilityFacts(ctx: LivabilityContext, building: number): LivabilityFacts | null {
   const b = ctx.district.buildings[building];
   if (!b) return null;
   const ring = b.rings[0] as Float64Array;
@@ -218,7 +259,7 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
   const view = windowView(ctx, building);
   const primary = primarySchoolOf(ctx, access, b.compound);
 
-  return scoreLivability({
+  return {
     windows,
     windowAzimuths,
     metroMinutes: minutes('metro'),
@@ -230,6 +271,7 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
     kindergartenMinutes: nearestMinutes(access, ctx.pois, KINDERGARTEN),
     primaryMinutes: primary.minutes,
     primarySchool: primary.name,
+    schoolGroup: primary.group,
     middleMinutes: nearestMinutes(access, ctx.pois, MIDDLE),
     within10: {
       grocery: cat('grocery')?.within10 ?? 0,
@@ -247,5 +289,17 @@ export function livabilityOf(ctx: LivabilityContext, building: number): Livabili
     builtYear: builtYearOf(ctx.district, b.compound),
     foodAdjacent: adjacentFood(ctx.district, ring),
     property: propertyOf(ctx.district, b.compound),
-  });
+    foodNear: foodWithin(ctx.district, x, y),
+    hubs: hubMinutes(ctx, access),
+    market: marketOf(ctx.district, b.compound),
+  };
+}
+
+export function livabilityOf(
+  ctx: LivabilityContext,
+  building: number,
+  profile: ProfileKey = 'balanced',
+): Livability | null {
+  const facts = livabilityFacts(ctx, building);
+  return facts ? scoreLivability(facts, profile) : null;
 }
