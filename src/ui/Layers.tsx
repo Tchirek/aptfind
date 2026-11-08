@@ -62,14 +62,14 @@ function Toggle({
   );
 }
 
-/** 看房视角：换一种人的需求，屋顶颜色和评分都跟着变 */
+/** 价值取向：换一种人的需求，屋顶颜色和评分都跟着变 */
 function ProfilePicker() {
   const profile = useApp((s) => s.profile);
   const setProfile = useApp((s) => s.setProfile);
   return (
     <div className="layers-row">
-      <div className="layers-title">看房视角</div>
-      <div className="lg-profiles" role="radiogroup" aria-label="看房视角">
+      <div className="layers-title">价值取向</div>
+      <div className="lg-profiles" role="radiogroup" aria-label="价值取向">
         {PROFILE_KEYS.map((key) => (
           <label key={key} className={profile === key ? 'on' : ''}>
             <input
@@ -82,13 +82,12 @@ function ProfilePicker() {
           </label>
         ))}
       </div>
-      <p className="lg-blurb">{PROFILES[profile].blurb}</p>
     </div>
   );
 }
 
 /**
- * 图层：右上角的按钮，点开后可以选看房视角、开关"典型路况"与"人流热度"，各带图例；
+ * 图层：右上角的按钮，点开后可以开关"典型路况"与"人流热度"（各带图例），再选价值取向；
  * 宽屏上图层打开时，左下角常驻一张小图例。
  */
 export function Layers() {
@@ -131,7 +130,6 @@ export function Layers() {
         </button>
         {open && (
           <div className="panel layers-pop">
-            <ProfilePicker />
             <div className="layers-row">
               <div className="layers-title">图层</div>
               <Toggle
@@ -145,6 +143,7 @@ export function Layers() {
               <Toggle on={layers.crowd} onChange={(v) => setLayer('crowd', v)} label="人流热度" />
               <CrowdKey />
             </div>
+            <ProfilePicker />
           </div>
         )}
       </div>

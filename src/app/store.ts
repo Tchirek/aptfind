@@ -64,7 +64,7 @@ interface AppState {
   viewshed: number | null;
   /** 地图图层：路况、人流热度 */
   layers: { traffic: boolean; crowd: boolean };
-  /** 看房视角：评分权重与屋顶颜色跟着变 */
+  /** 价值取向：评分权重与屋顶颜色跟着变 */
   profile: ProfileKey;
   setDate: (date: CivilDate) => void;
   setMinute: (minute: number) => void;

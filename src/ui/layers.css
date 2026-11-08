@@ -47,7 +47,7 @@
   padding-top: 12px;
   border-top: 1px solid #e6ecf3;
 }
-/* 看房视角：三列两行，选中的是深底 */
+/* 价值取向：三列两行，选中的是深底 */
 .lg-profiles {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -83,12 +83,6 @@
 .lg-profiles label.on {
   background: var(--ink);
   color: #fff;
-}
-.lg-blurb {
-  margin: 8px 0 0;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--ink-3);
 }
 /* 面板收起时，按钮旁边留一个小标签，看得出屋顶现在按什么上色 */
 .layers-tag {
