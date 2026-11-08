@@ -311,7 +311,8 @@ def read_csv(path: Path, key: str) -> dict[str, dict]:
 def price_of(row: dict) -> dict:
     """compound_info.csv 的 price（"25880" 或 "17434–17586"）与 price_source → pv、pk"""
     lo, _, hi = row["price"].partition("–")
-    kind = "安居客挂牌均价" if row["price_source"].startswith("安居客") else "房天下小区参考价"
+    src = row["price_source"]
+    kind = "安居客挂牌均价" if src.startswith("安居客") else "房天下新房均价" if "新房" in src else "房天下小区参考价"
     return {"pv": [int(lo), int(hi or lo)], "pk": kind}
 
 
