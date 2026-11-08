@@ -8,11 +8,13 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { allEntrances } from '../src/app/entrances';
-import { livabilityOf } from '../src/app/livabilityFacts';
+import { livabilityFacts } from '../src/app/livabilityFacts';
 import { Barriers, barrierSegments } from '../src/engine/barriers';
 import { decodeDistrict } from '../src/engine/district';
 import { buildSolids, buildWindowGrid, gridHash } from '../src/engine/geometry';
+import { scoreLivability } from '../src/engine/livability';
 import { MetroGraph } from '../src/engine/metro';
+import { PROFILE_KEYS, PROFILES, type ProfileKey } from '../src/engine/profiles';
 import { decodeRegion, stationLines } from '../src/engine/region';
 import { SunlightEngine } from '../src/engine/sunlight';
 import { snapPois, WalkGraph } from '../src/engine/walk';
@@ -59,24 +61,34 @@ const ctx = {
 };
 
 const t0 = performance.now();
-const scores: number[] = district.buildings.map(() => -1);
+const scores = Object.fromEntries(
+  PROFILE_KEYS.map((key) => [key, district.buildings.map(() => -1)]),
+) as Record<ProfileKey, number[]>;
 const targets = district.buildings.filter((b) => b.core && b.cls === 'R');
 targets.forEach((b, k) => {
-  const l = livabilityOf(ctx, b.index);
-  if (l) scores[b.index] = l.total;
+  const facts = livabilityFacts(ctx, b.index);
+  if (facts) {
+    for (const key of PROFILE_KEYS) scores[key][b.index] = scoreLivability(facts, key).total;
+  }
   if (process.stderr.isTTY && k % 50 === 0) process.stderr.write(`\r${k} / ${targets.length}`);
 });
 if (process.stderr.isTTY) process.stderr.write('\n');
 
-const got = scores.filter((s) => s >= 0).sort((a, b) => a - b);
-const q = (p: number) => got[Math.floor(p * (got.length - 1))] as number;
-// 屋顶色阶的节点：按片区实际分数的分位，五档颜色都落在真实存在的楼上
-const stops = [0.05, 0.25, 0.5, 0.75, 0.95].map(q);
+const profiles = Object.fromEntries(
+  PROFILE_KEYS.map((key) => {
+    const got = scores[key].filter((s) => s >= 0).sort((a, b) => a - b);
+    const q = (p: number) => got[Math.floor(p * (got.length - 1))] as number;
+    // 屋顶色阶的节点：按片区实际分数的分位，五档颜色都落在真实存在的楼上；投资用绝对分数
+    const stops = PROFILES[key].absoluteStops ?? [0.05, 0.25, 0.5, 0.75, 0.95].map(q);
+    console.log(
+      `${PROFILES[key].label.padEnd(6)} ${got.length} 栋；` +
+        `最低 ${q(0)} · 四分位 ${q(0.25)} / ${q(0.5)} / ${q(0.75)} · 最高 ${q(1)}`,
+    );
+    return [key, { stops, scores: scores[key] }];
+  }),
+);
 writeFileSync(
   new URL('livability.json', DATA),
-  `${JSON.stringify({ gridHash: meta.gridHash, stops, scores })}\n`,
+  `${JSON.stringify({ gridHash: meta.gridHash, profiles })}\n`,
 );
-console.log(
-  `${got.length} 栋住宅，用时 ${((performance.now() - t0) / 1000).toFixed(1)} s；` +
-    `分数 最低 ${q(0)} · 四分位 ${q(0.25)} / ${q(0.5)} / ${q(0.75)} · 最高 ${q(1)}`,
-);
+console.log(`用时 ${((performance.now() - t0) / 1000).toFixed(1)} s`);

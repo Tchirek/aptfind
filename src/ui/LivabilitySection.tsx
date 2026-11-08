@@ -1,5 +1,6 @@
 import { useApp } from '../app/store';
 import type { Fact } from '../engine/livability';
+import { PROFILES } from '../engine/profiles';
 
 /** 依据排成四列小格：上面是短标签，下面是数值，各维度之间上下对齐 */
 function Facts({ facts }: { facts: Fact[] }) {
@@ -27,20 +28,30 @@ function Facts({ facts }: { facts: Fact[] }) {
 /** 选中楼的宜居评分：总分、逐项贡献（带依据）与扣分项 */
 export function LivabilitySection({ building }: { building: number }) {
   const livability = useApp((s) => s.livability);
+  const title = useApp((s) => PROFILES[s.profile].title);
   const mine = livability?.building === building ? livability : null;
 
   if (!mine) {
     return (
       <section>
-        <div className="label">宜居评分</div>
+        <div className="label">{title}</div>
         <div className="liv-loading muted">计算中…</div>
+      </section>
+    );
+  }
+
+  if (mine.unavailable) {
+    return (
+      <section>
+        <div className="label">{title}</div>
+        <div className="liv-loading muted">{mine.summary}</div>
       </section>
     );
   }
 
   return (
     <section>
-      <div className="label">宜居评分</div>
+      <div className="label">{title}</div>
       <div className="liv-top">
         <span className="liv-score mono">{mine.total}</span>
         <span className={`liv-grade ${mine.tone}`}>{mine.label}</span>

@@ -8,6 +8,7 @@ import { type District, loadDistrict } from '../engine/district';
 import { buildSolids, buildWindowGrid, gridHash, type WindowGrid } from '../engine/geometry';
 import type { Entrance } from '../engine/isochrone';
 import { MetroGraph } from '../engine/metro';
+import { PROFILE_KEYS, type ProfileKey } from '../engine/profiles';
 import { loadRegion, type Region, stationLines } from '../engine/region';
 import { SunlightEngine } from '../engine/sunlight';
 import { type SnappedPoi, snapPois, WalkGraph } from '../engine/walk';
@@ -20,10 +21,13 @@ export interface SceneData {
   dahanMinutes: Float32Array;
   /** 每栋楼在窗位网格里的区间 [起点, 数量]，没有窗位的楼数量为 0 */
   windowRange: Uint32Array;
-  /** 预计算的宜居评分（核心区住宅），屋顶按它着色；没有为 −1 */
-  roofScores: Int16Array;
-  /** 屋顶色阶的节点：片区分数的 5%、25%、50%、75%、95% 分位 */
-  roofStops: number[] | undefined;
+  /** 各视角预计算的评分（核心区住宅）与屋顶色阶节点；没有的楼分数为 −1 */
+  roofs: Partial<Record<ProfileKey, RoofScores>>;
+}
+
+export interface RoofScores {
+  scores: Int16Array;
+  stops: number[];
 }
 
 interface SunlightMeta {
@@ -42,7 +46,10 @@ async function load(): Promise<SceneData> {
     fetch(`${base}data/livability.json`)
       .then((r) =>
         r.ok
-          ? (r.json() as Promise<{ gridHash: number; scores: number[]; stops: number[] }>)
+          ? (r.json() as Promise<{
+              gridHash: number;
+              profiles: Record<ProfileKey, { scores: number[]; stops: number[] }>;
+            }>)
           : null,
       )
       .catch(() => null),
@@ -61,13 +68,16 @@ async function load(): Promise<SceneData> {
     windowRange[2 * b + 1] = (windowRange[2 * b + 1] as number) + 1;
   }
   // 评分与日照出自同一份窗位网格才用，否则屋顶不着色
-  const roofScores = new Int16Array(district.buildings.length).fill(-1);
-  let roofStops: number[] | undefined;
-  if (liv && liv.gridHash === meta.gridHash && liv.scores.length === roofScores.length) {
-    roofScores.set(liv.scores);
-    roofStops = liv.stops;
+  const roofs: SceneData['roofs'] = {};
+  if (liv && liv.gridHash === meta.gridHash) {
+    for (const key of PROFILE_KEYS) {
+      const p = liv.profiles[key];
+      if (p && p.scores.length === district.buildings.length) {
+        roofs[key] = { scores: Int16Array.from(p.scores), stops: p.stops };
+      }
+    }
   }
-  return { district, grid, dahanMinutes, windowRange, roofScores, roofStops };
+  return { district, grid, dahanMinutes, windowRange, roofs };
 }
 
 export const sceneData: Promise<SceneData> = load();

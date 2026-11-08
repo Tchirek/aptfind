@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../app/store';
 import { TRAFFIC_LEVELS } from '../engine/flows';
+import { PROFILE_KEYS, PROFILES } from '../engine/profiles';
 import { CROWD_COLOR, TRAFFIC_COLORS } from '../scene/trafficStyle';
 import './layers.css';
 
@@ -61,13 +62,39 @@ function Toggle({
   );
 }
 
+/** 看房视角：换一种人的需求，屋顶颜色和评分都跟着变 */
+function ProfilePicker() {
+  const profile = useApp((s) => s.profile);
+  const setProfile = useApp((s) => s.setProfile);
+  return (
+    <div className="layers-row">
+      <div className="layers-title">看房视角</div>
+      <div className="lg-profiles" role="radiogroup" aria-label="看房视角">
+        {PROFILE_KEYS.map((key) => (
+          <label key={key} className={profile === key ? 'on' : ''}>
+            <input
+              type="radio"
+              name="profile"
+              checked={profile === key}
+              onChange={() => setProfile(key)}
+            />
+            {PROFILES[key].label}
+          </label>
+        ))}
+      </div>
+      <p className="lg-blurb">{PROFILES[profile].blurb}</p>
+    </div>
+  );
+}
+
 /**
- * 图层：右上角的按钮，点开后可以开关"典型路况"与"人流热度"，各带图例；
+ * 图层：右上角的按钮，点开后可以选看房视角、开关"典型路况"与"人流热度"，各带图例；
  * 宽屏上图层打开时，左下角常驻一张小图例。
  */
 export function Layers() {
   const layers = useApp((s) => s.layers);
   const setLayer = useApp((s) => s.setLayer);
+  const profile = useApp((s) => s.profile);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -90,6 +117,9 @@ export function Layers() {
   return (
     <>
       <div className="layers" ref={root}>
+        {profile !== 'balanced' && !open && (
+          <span className="layers-tag">{PROFILES[profile].label}</span>
+        )}
         <button
           type="button"
           className={`layers-btn${open ? ' on' : ''}`}
@@ -101,8 +131,9 @@ export function Layers() {
         </button>
         {open && (
           <div className="panel layers-pop">
-            <div className="layers-title">图层</div>
+            <ProfilePicker />
             <div className="layers-row">
+              <div className="layers-title">图层</div>
               <Toggle
                 on={layers.traffic}
                 onChange={(v) => setLayer('traffic', v)}

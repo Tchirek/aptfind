@@ -44,6 +44,10 @@ export interface BuildingMesh {
   geometry: BufferGeometry;
   /** 每个顶点所属建筑的下标，拾取时反查 */
   vertexBuilding: Uint32Array;
+  /** 每栋楼屋顶的顶点区间 [起点, 个数] */
+  roofRange: Uint32Array;
+  /** 每栋楼没有评分时的屋顶色 rgb */
+  plainRoof: Float32Array;
 }
 
 /**
@@ -75,17 +79,42 @@ export function roofColorOf(
   return out.copy(ROOF_RAMP[n - 1] as Color);
 }
 
-export function buildBuildingGeometry(
-  buildings: readonly Building[],
-  /** 每栋楼的宜居评分，−1 表示不着色（用默认屋顶色） */
-  scores?: Int16Array,
-  /** 色阶节点（分数），见 roofColorOf */
-  stops?: readonly number[],
-): BuildingMesh {
+/** 按某个视角的评分重涂屋顶；分数 −1 的楼用默认屋顶色。只改颜色，不重建网格 */
+export function paintRoofs(
+  mesh: BuildingMesh,
+  scores: Int16Array | undefined,
+  stops: readonly number[] | undefined,
+): void {
+  const attr = mesh.geometry.getAttribute('color') as BufferAttribute;
+  const c = new Color();
+  const n = mesh.roofRange.length / 2;
+  for (let b = 0; b < n; b++) {
+    const count = mesh.roofRange[2 * b + 1] as number;
+    if (count === 0) continue;
+    const score = scores?.[b] ?? -1;
+    if (score >= 0) {
+      // 同一档里也有一点明暗差，像真实的屋面
+      roofColorOf(score, stops, c).multiplyScalar(0.95 + 0.1 * rand(b + 104729));
+    } else {
+      c.setRGB(
+        mesh.plainRoof[3 * b] as number,
+        mesh.plainRoof[3 * b + 1] as number,
+        mesh.plainRoof[3 * b + 2] as number,
+      );
+    }
+    const start = mesh.roofRange[2 * b] as number;
+    for (let v = start; v < start + count; v++) attr.setXYZ(v, c.r, c.g, c.b);
+  }
+  attr.needsUpdate = true;
+}
+
+export function buildBuildingGeometry(buildings: readonly Building[]): BuildingMesh {
   const pos: number[] = [];
   const facade: number[] = [];
   const color: number[] = [];
   const owner: number[] = [];
+  const roofRange = new Uint32Array(buildings.length * 2);
+  const plainRoof = new Float32Array(buildings.length * 3);
   const wall = new Color();
   const roof = new Color();
 
@@ -98,13 +127,8 @@ export function buildBuildingGeometry(
     wall.set(palette[Math.floor(rand(b.index) * palette.length)] as string);
     // 同色系里再做一点明暗差，避免一片楼完全同色
     wall.multiplyScalar(0.96 + 0.08 * rand(b.index + 7919));
-    const score = scores?.[b.index] ?? -1;
-    if (score >= 0) {
-      // 同一档里也有一点明暗差，像真实的屋面
-      roofColorOf(score, stops, roof).multiplyScalar(0.95 + 0.1 * rand(b.index + 104729));
-    } else {
-      roof.copy(wall).lerp(ROOF_TINT, 0.6);
-    }
+    roof.copy(wall).lerp(ROOF_TINT, 0.6);
+    plainRoof.set([roof.r, roof.g, roof.b], 3 * b.index);
     const z0 = b.base;
     const z1 = b.base + h;
     const before = pos.length;
@@ -138,6 +162,7 @@ export function buildBuildingGeometry(
     }
 
     const [outer, ...holes] = b.rings;
+    roofRange[2 * b.index] = pos.length / 3;
     if (outer) {
       const contour: Vector2[] = [];
       for (let i = 0; i < outer.length; i += 2) contour.push(new Vector2(outer[i], outer[i + 1]));
@@ -154,6 +179,7 @@ export function buildBuildingGeometry(
         for (const v of [p, s, t]) vert(v.x, v.y, z1, -1, -1, roof);
       }
     }
+    roofRange[2 * b.index + 1] = pos.length / 3 - (roofRange[2 * b.index] as number);
 
     for (let k = before; k < pos.length; k += 3) owner.push(b.index);
   }
@@ -165,5 +191,5 @@ export function buildBuildingGeometry(
   g.setAttribute('aBuilding', new BufferAttribute(Float32Array.from(owner), 1));
   g.computeVertexNormals();
   g.computeBoundingSphere();
-  return { geometry: g, vertexBuilding: Uint32Array.from(owner) };
+  return { geometry: g, vertexBuilding: Uint32Array.from(owner), roofRange, plainRoof };
 }

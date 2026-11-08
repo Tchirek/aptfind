@@ -47,6 +47,64 @@
   padding-top: 12px;
   border-top: 1px solid #e6ecf3;
 }
+/* 看房视角：三列两行，选中的是深底 */
+.lg-profiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.lg-profiles input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.lg-profiles label {
+  display: block;
+  height: 28px;
+  line-height: 28px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 6px;
+  background: #eef2f7;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.lg-profiles label:hover {
+  background: #e2e8f0;
+}
+.lg-profiles label:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.lg-profiles label.on {
+  background: var(--ink);
+  color: #fff;
+}
+.lg-blurb {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--ink-3);
+}
+/* 面板收起时，按钮旁边留一个小标签，看得出屋顶现在按什么上色 */
+.layers-tag {
+  position: absolute;
+  top: 9px;
+  right: 48px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  line-height: 22px;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .lg-switch {
   display: flex;
   align-items: center;

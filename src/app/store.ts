@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { WindowGrid } from '../engine/geometry';
+import type { ProfileKey } from '../engine/profiles';
 import type { CivilDate } from '../engine/solar';
 import type { BuildingSunlight } from './buildingSunlight';
 import type { LivabilityResult } from './livability';
@@ -63,6 +64,8 @@ interface AppState {
   viewshed: number | null;
   /** 地图图层：路况、人流热度 */
   layers: { traffic: boolean; crowd: boolean };
+  /** 看房视角：评分权重与屋顶颜色跟着变 */
+  profile: ProfileKey;
   setDate: (date: CivilDate) => void;
   setMinute: (minute: number) => void;
   /** 回到现在，并开始跟随 */
@@ -80,6 +83,7 @@ interface AppState {
   setLivability: (l: LivabilityResult | null) => void;
   toggleViewshed: (window: number) => void;
   setLayer: (name: 'traffic' | 'crowd', on: boolean) => void;
+  setProfile: (profile: ProfileKey) => void;
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -96,6 +100,7 @@ export const useApp = create<AppState>((set, get) => ({
   livability: null,
   viewshed: null,
   layers: { traffic: true, crowd: true },
+  profile: 'balanced',
   setDate: (date) => set({ date, live: false }),
   setMinute: (minute) => set({ minute: ((minute % 1440) + 1440) % 1440, live: false }),
   goLive: () => set({ ...nowBeijing(), live: true, playing: false }),
@@ -113,4 +118,5 @@ export const useApp = create<AppState>((set, get) => ({
   setLivability: (livability) => set({ livability }),
   toggleViewshed: (window) => set({ viewshed: get().viewshed === window ? null : window }),
   setLayer: (name, on) => set({ layers: { ...get().layers, [name]: on } }),
+  setProfile: (profile) => set({ profile }),
 }));

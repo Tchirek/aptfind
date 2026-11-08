@@ -5,7 +5,7 @@ import type { SceneData } from '../app/data';
 import { selectedBuilding, useApp } from '../app/store';
 import type { Building } from '../engine/district';
 import { buildSolids } from '../engine/geometry';
-import { buildBuildingGeometry } from './buildingGeometry';
+import { buildBuildingGeometry, paintRoofs } from './buildingGeometry';
 import { buildingUniforms, createBuildingMaterial } from './buildingMaterial';
 
 const OUTLINE_COLOR = '#0f1e33';
@@ -45,13 +45,20 @@ export function Buildings({ data }: { data: SceneData }) {
   const focus = useApp((s) => s.focusBuilding);
   const select = useApp((s) => s.select);
   const requestFly = useApp((s) => s.requestFly);
+  const profile = useApp((s) => s.profile);
   const { buildings } = data.district;
 
   const mesh = useMemo(() => {
-    const m = buildBuildingGeometry(buildings, data.roofScores, data.roofStops);
+    const m = buildBuildingGeometry(buildings);
     m.geometry.computeBoundsTree();
     return m;
-  }, [buildings, data.roofScores, data.roofStops]);
+  }, [buildings]);
+
+  // 换视角只重涂屋顶
+  const roofs = data.roofs[profile];
+  useEffect(() => {
+    paintRoofs(mesh, roofs?.scores, roofs?.stops);
+  }, [mesh, roofs]);
   const material = useMemo(() => createBuildingMaterial(), []);
 
   const current = selectedBuilding(selection, data.grid);
