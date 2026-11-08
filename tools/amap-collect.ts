@@ -10,6 +10,8 @@
  *   await jgCollect.pois()    按类别搜索片区内的设施 POI
  *   await jgCollect.brands()  麦当劳、肯德基、星巴克（片区外扩约 3 km）与大型商超（外扩约 8 km）
  *   await jgCollect.photos()  小区、校园的地点详情照片（读 compound-points.json，由管线生成）
+ *   await jgCollect.addresses()  住宅小区登记的门牌（同样读 compound-points.json），供对口小学划片
+ *   await jgCollect.schools([...])  按校名搜划片表里的公办小学
  */
 
 import { wgs84ToGcj02 } from './gcj02';
@@ -374,7 +376,86 @@ async function photos(): Promise<number> {
   return Object.keys(out).length;
 }
 
-const api = { regeo, roads, pois, brands, campusNames, photos };
+interface PlaceHit {
+  poi: string;
+  id: string;
+  type: string;
+  address: string;
+  location: string;
+  distance: number;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: 高德 POI
+const placeHit = (p: any): PlaceHit => ({
+  poi: p.name,
+  id: p.id,
+  type: p.type,
+  address: typeof p.address === 'string' ? p.address : '',
+  location: `${p.location.lng},${p.location.lat}`,
+  distance: Number(p.distance ?? Number.NaN),
+});
+
+/**
+ * 小区门牌：对口小学按门牌划片，要的是小区登记的门牌，不是楼旁边的门牌。
+ * 每个住宅小区按名字在附近搜，留下名字对得上、类型是住宅的几条，由管线挑最近的那条。
+ */
+async function addresses(): Promise<number> {
+  const input = (await (
+    await fetch('/pipeline/raw/amap/compound-points.json')
+  ).json()) as CompoundPoint[];
+  const out: Record<string, PlaceHit[]> = {};
+  const homes = input.filter((c) => c.kind === 'residential');
+  for (const c of homes) {
+    const [lng, lat] = wgs84ToGcj02(c.lon, c.lat);
+    const want = normName(c.name);
+    const ps = new window.AMap.PlaceSearch({ pageSize: 20, pageIndex: 1, extensions: 'base' });
+    // biome-ignore lint/suspicious/noExplicitAny: 高德回调结果
+    const r = await new Promise<any>((resolve) => {
+      // biome-ignore lint/suspicious/noExplicitAny: 高德回调结果
+      ps.searchNearBy(want, [lng, lat], 1500, (status: string, res: any) =>
+        resolve(status === 'complete' ? res : { poiList: { pois: [] } }),
+      );
+    });
+    const hits = (r.poiList?.pois ?? [])
+      // biome-ignore lint/suspicious/noExplicitAny: 高德 POI
+      .filter((p: any) => {
+        const n = normName(p.name);
+        return (n.includes(want) || want.includes(n)) && /住宅|别墅|宿舍/.test(p.type);
+      })
+      .map(placeHit)
+      .slice(0, 5);
+    out[c.name] = hits;
+    log(`${c.name}：${hits[0]?.address || '—'}（${Object.keys(out).length}/${homes.length}）`);
+    await sleep(420);
+  }
+  await save('addresses', out);
+  return Object.keys(out).length;
+}
+
+/** 划片表里的公办小学：按校名搜，片区外扩约 3 km，留下类型是学校的条目 */
+async function schools(names: string[]): Promise<number> {
+  const WIDE = { south: 30.578, west: 104.075, north: 30.655, east: 104.165 };
+  const bounds = new window.AMap.Bounds(
+    wgs84ToGcj02(WIDE.west, WIDE.south),
+    wgs84ToGcj02(WIDE.east, WIDE.north),
+  );
+  const out: Record<string, PlaceHit[]> = {};
+  for (const name of names) {
+    const ps = new window.AMap.PlaceSearch({ pageSize: 20, pageIndex: 1, extensions: 'base' });
+    const r = await searchPage(ps, name, bounds);
+    out[name] = (r.poiList?.pois ?? [])
+      // biome-ignore lint/suspicious/noExplicitAny: 高德 POI
+      .filter((p: any) => /学校/.test(p.type))
+      .map(placeHit)
+      .slice(0, 6);
+    log(`${name}：${out[name]?.[0]?.poi ?? '—'}`);
+    await sleep(420);
+  }
+  await save('poi-catchment-schools', out);
+  return Object.keys(out).length;
+}
+
+const api = { regeo, roads, pois, brands, campusNames, photos, addresses, schools };
 
 loadAMap()
   .then(() => {
