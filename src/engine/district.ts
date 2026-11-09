@@ -60,7 +60,7 @@ export interface Compound {
   /** 对口公办小学在 District.schools 里的下标（按划片），-1 表示没查到 */
   primarySchool: number;
   /** 二手房价（元/㎡，2026 年 11 月读取）：几期合在一块地的给区间；查不到为 null */
-  price: { low: number; high: number; source: string } | null;
+  price: { low: number; high: number; kind: string } | null;
   /** 整租月租金（元/㎡）、挂牌均价近一年涨跌（%）；查不到为 null */
   rent: number | null;
   yoy: number | null;
@@ -236,7 +236,7 @@ export function decodeDistrict(json: DistrictJson): District {
       plotRatio: c.fr ?? null,
       propertyCompany: c.pm ?? null,
       primarySchool: c.ps ?? -1,
-      price: c.pv ? { low: c.pv[0], high: c.pv[1], source: c.pk ?? '' } : null,
+      price: c.pv ? { low: c.pv[0], high: c.pv[1], kind: c.pk ?? '二手房' } : null,
       rent: c.rv ?? null,
       yoy: c.yo ?? null,
       rings: c.r.map(decode),

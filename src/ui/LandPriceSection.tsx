@@ -9,8 +9,8 @@
  * 本地成交：四川师大站 TOD 两宗地 2020-11 成交楼面价 6400、9100 元/㎡。
  * 成交价受地块条件、配建与市场行情影响，与基准地价不是一回事。
  *
- * 查得到二手房价的小区直接给房价（房天下小区参考价，个别取安居客挂牌均价，2026-11 读取，
- * 出处逐条记在 pipeline/compound_info.csv），比片区的基准地价区间更贴近这一栋楼。
+ * 查得到房价的小区直接给房价（2026-11 读取，
+ * 出处逐条记在 pipeline/compound_info.csv，面板上只说来自网络公开信息），比片区的基准地价区间更贴近这一栋楼。
  */
 
 import type { Compound, District } from '../engine/district';
@@ -52,7 +52,7 @@ export function LandPriceSection({ price }: { price: Compound['price'] }) {
           </span>
           <span className="price-unit">元/㎡</span>
         </div>
-        <p className="price-sub">{price.source} · 2026 年 11 月</p>
+        <p className="price-sub">{price.kind} · 来自网络公开信息 · 2026 年 11 月</p>
       </section>
     );
   }
