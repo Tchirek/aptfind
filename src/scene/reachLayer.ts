@@ -75,7 +75,7 @@ vec3 jgReach(vec3 base, vec2 p) {
   vec3 c30 = mix(vec3(0.17, 0.52, 0.56), vec3(0.45, 0.80, 1.00), uNight);
 
   // 填色只作底：近处略浓、远处渐淡，主要信息交给等时线
-  float a = in30 * mix(0.16, 0.05, smoothstep(0.0, budget, tc)) + in15 * 0.05;
+  float a = in30 * mix(0.22, 0.08, smoothstep(0.0, budget, tc)) + in15 * 0.14;
   a *= mix(1.0, 1.8, uNight);
   vec3 col = mix(base, mix(c30, c15, in15), clamp(a, 0.0, 1.0));
 
@@ -83,11 +83,15 @@ vec3 jgReach(vec3 base, vec2 p) {
   float m5 = abs(fract(tc / 5.0 + 0.5) - 0.5) * 5.0 / fc;
   col = mix(col, c30, (1.0 - smoothstep(0.4, 1.2, m5)) * in30 * 0.22);
 
-  // 等时线：15 分钟（只步行）粗，30 分钟（步行 + 地铁）略细
-  float l15 = 1.0 - smoothstep(1.0, 2.2, abs(tw - 15.0) / fw);
-  float l30 = 1.0 - smoothstep(0.7, 1.8, abs(tc - budget) / fc);
-  col = mix(col, c15, l15 * shownW * 0.95);
-  col = mix(col, c30, l30 * shownC * 0.9);
+  // 等时线：15 分钟（只步行）粗，30 分钟（步行 + 地铁）略细；外面一圈衬边，压在路网和阴影上也分得出
+  float d15 = abs(tw - 15.0) / fw;
+  float d30 = abs(tc - budget) / fc;
+  float l15 = 1.0 - smoothstep(1.6, 2.8, d15);
+  float l30 = 1.0 - smoothstep(1.2, 2.4, d30);
+  float halo = max((1.0 - smoothstep(2.8, 4.4, d15)) * shownW, (1.0 - smoothstep(2.4, 4.0, d30)) * shownC);
+  col = mix(col, mix(vec3(1.0), vec3(0.02, 0.05, 0.08), uNight), halo * 0.78);
+  col = mix(col, c15, l15 * shownW);
+  col = mix(col, c30, l30 * shownC * (1.0 - l15 * shownW));
 
   // 生长中的波前
   float growing = 1.0 - step(budget + 0.5, rev);
