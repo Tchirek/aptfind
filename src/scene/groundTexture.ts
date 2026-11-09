@@ -74,8 +74,7 @@ export function buildGroundTexture(d: District, size = 4096): GroundTextures {
   // 画布 y 向下，北在上
   const px = (x: number) => (x - ext.minX) * sx;
   const py = (y: number) => (ext.maxY - y) * sy;
-  const path = (pts: Float64Array, close: boolean) => {
-    ctx.beginPath();
+  const trace = (pts: Float64Array, close: boolean) => {
     for (let i = 0; i < pts.length; i += 2) {
       const x = px(pts[i] as number);
       const y = py(pts[i + 1] as number);
@@ -83,6 +82,10 @@ export function buildGroundTexture(d: District, size = 4096): GroundTextures {
       else ctx.lineTo(x, y);
     }
     if (close) ctx.closePath();
+  };
+  const path = (pts: Float64Array, close: boolean) => {
+    ctx.beginPath();
+    trace(pts, close);
   };
 
   ctx.fillStyle = GROUND;
@@ -156,18 +159,20 @@ export function buildGroundTexture(d: District, size = 4096): GroundTextures {
   }
   ctx.setLineDash([]);
 
-  // 楼脚的接地阴影：轮廓向外晕开几米，与外墙墙脚压暗接上
+  // 楼脚的接地阴影：轮廓向外晕开几米，与外墙墙脚压暗接上。
+  // 所有轮廓并成一条路径只填一次：带模糊的 multiply 填充在 GPU 画布上每次都要拷贝背景、
+  // 新开图层，逐栋填时几千份临时纹理能把 GPU 进程堵住半分钟，整个浏览器跟着卡死。
   ctx.save();
   ctx.globalCompositeOperation = 'multiply';
   ctx.fillStyle = 'rgb(196, 205, 218)';
   ctx.shadowColor = 'rgba(40, 52, 70, 0.38)';
   ctx.shadowBlur = 5 * sx;
+  ctx.beginPath();
   for (const b of d.buildings) {
     const outer = b.rings[0];
-    if (!outer) continue;
-    path(outer, true);
-    ctx.fill();
+    if (outer) trace(outer, true);
   }
+  ctx.fill();
   ctx.restore();
 
   // 夜里的路灯：只画道路，主干道更亮
