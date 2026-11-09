@@ -40,6 +40,19 @@ export interface FlyTo {
   nonce: number;
 }
 
+/** 把一块范围（ENU 平面坐标）摆进地图没被面板挡住的部分 */
+export interface FitTo {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  /** 镜头极角：0 是正俯视 */
+  polar: number;
+  /** 方位：0 是北朝上；不给就保持当前方位 */
+  azimuth?: number;
+  nonce: number;
+}
+
 interface AppState {
   /** 场景日期（北京时间） */
   date: CivilDate;
@@ -52,6 +65,7 @@ interface AppState {
   /** 在时间轴上悬停/点选的挡光建筑，用于在场景里高亮 */
   focusBuilding: number | null;
   flyTo: FlyTo | null;
+  fitTo: FitTo | null;
   marker: Marker | null;
   route: Route | null;
   /** 选中楼在所选日期的逐窗日照（边算边更新） */
@@ -76,6 +90,7 @@ interface AppState {
   select: (s: Selection) => void;
   setFocusBuilding: (b: number | null) => void;
   requestFly: (target: [number, number, number], distance: number) => void;
+  requestFit: (fit: Omit<FitTo, 'nonce'>) => void;
   setMarker: (m: Marker | null) => void;
   setRoute: (r: Route | null) => void;
   setSunlight: (s: BuildingSunlight | null) => void;
@@ -93,6 +108,7 @@ export const useApp = create<AppState>((set, get) => ({
   selection: null,
   focusBuilding: null,
   flyTo: null,
+  fitTo: null,
   marker: null,
   route: null,
   sunlight: null,
@@ -111,6 +127,7 @@ export const useApp = create<AppState>((set, get) => ({
   select: (selection) => set({ selection, focusBuilding: null, route: null, viewshed: null }),
   setFocusBuilding: (focusBuilding) => set({ focusBuilding }),
   requestFly: (target, distance) => set({ flyTo: { target, distance, nonce: Math.random() } }),
+  requestFit: (fit) => set({ fitTo: { ...fit, nonce: Math.random() } }),
   setMarker: (marker) => set({ marker }),
   setRoute: (route) => set({ route }),
   setSunlight: (sunlight) => set({ sunlight }),

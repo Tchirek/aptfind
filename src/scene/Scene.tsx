@@ -74,7 +74,7 @@ export function Scene({ data }: { data: SceneData }) {
         maxPolarAngle={1.38}
         screenSpacePanning={false}
       />
-      <CameraRig />
+      <CameraRig data={data} />
       <TouchGestures />
       <CameraFit />
       <Labels district={data.district} />

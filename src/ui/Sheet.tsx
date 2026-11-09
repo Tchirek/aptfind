@@ -105,6 +105,15 @@ export function Sheet({
     return () => root.setProperty('--sheet-h', '0px');
   }, [state, dims.peek]);
 
+  // 面板里的按钮要看地图时（可达范围取景），把抽屉收回去
+  useEffect(() => {
+    const peek = () => {
+      if (stateRef.current === 'full') setState('peek');
+    };
+    window.addEventListener('aptfind:sheet-peek', peek);
+    return () => window.removeEventListener('aptfind:sheet-peek', peek);
+  }, []);
+
   const offsetOf = (s: State) => (s === 'full' ? 0 : s === 'peek' ? dims.h - dims.peek : dims.h);
 
   const setY = (y: number, animate: boolean) => {

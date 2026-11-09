@@ -81,6 +81,7 @@
 .reach-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 16px;
   margin-top: 8px;
 }
 

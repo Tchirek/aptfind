@@ -1,5 +1,6 @@
 import { type CSSProperties, useState } from 'react';
 import type { ReachStation } from '../app/reach.worker';
+import { type Bounds, fieldBounds } from '../app/reachBounds';
 import { useApp } from '../app/store';
 import './reach-section.css';
 
@@ -48,7 +49,7 @@ function tagStyle(s: ReachStation): CSSProperties {
 
 export function ReachSection({ building }: { building: number }) {
   const reach = useApp((s) => s.reach);
-  const requestFly = useApp((s) => s.requestFly);
+  const requestFit = useApp((s) => s.requestFit);
   const [expanded, setExpanded] = useState(false);
 
   if (!reach || reach.building !== building) {
@@ -60,19 +61,20 @@ export function ReachSection({ building }: { building: number }) {
     );
   }
 
-  const { area15, area30, stations, far } = reach;
+  const { area15, area30, stations, near, far, budget } = reach;
   // 收起时只看最近的 6 站（stations 已按出站时间排好），再按线路归组
   const visibleStations = groupByRoute(expanded ? stations : stations.slice(0, 6));
   const hasMore = stations.length > 6;
 
-  const handleFly = () => {
-    if (!far) return;
-    const { x0, y0, cell, nx, ny } = far.grid;
-    const cx = x0 + (nx * cell) / 2;
-    const cy = y0 + (ny * cell) / 2;
-    const side = Math.max(nx, ny) * cell;
-    requestFly([cx, cy, 0], side * 1.15);
+  // 手机上先把抽屉收起来，不然地图被挡住，看不到飞到了哪里
+  const frame = (bounds: Bounds | null, polar: number, azimuth?: number) => {
+    if (!bounds) return;
+    window.dispatchEvent(new Event('aptfind:sheet-peek'));
+    requestFit({ ...bounds, polar, azimuth });
   };
+  // 步行圈保持当前方位、略带俯角；全图接近正俯视、北朝上，范围一眼看全
+  const showWalk = () => near && frame(fieldBounds(near, 0, 15), 0.72);
+  const showAll = () => far && frame(fieldBounds(far, 1, budget), 0.16, 0);
 
   return (
     <section>
@@ -110,13 +112,18 @@ export function ReachSection({ building }: { building: number }) {
           )}
         </ul>
       )}
-      {far && (
-        <div className="reach-footer">
-          <button type="button" className="reach-text-btn" onClick={handleFly}>
+      <div className="reach-footer">
+        {near && (
+          <button type="button" className="reach-text-btn" onClick={showWalk}>
+            看步行范围
+          </button>
+        )}
+        {far && (
+          <button type="button" className="reach-text-btn" onClick={showAll}>
             看全图
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }
