@@ -11,7 +11,9 @@ import { sceneUniforms } from './lighting';
  *
  * - 地名（校园、小区、子片区、有名字的楼、地铁站）水平居中写在锚点上；
  * - 路名沿道路走向旋转，取道路上较直的一段，屏幕上放得下才写，同一条路相隔足够远才再写一次；
- * - 按优先级逐个放置，与已放下的标注相交就跳过，所以拉远时只剩主干道和大地块，拉近逐渐变密。
+ * - 按优先级逐个放置，与已放下的标注相交就跳过，所以拉远时只剩主干道和大地块，拉近逐渐变密；
+ * - 放置带记忆：已显示的标注排在同优先级前面，碰撞与距离阈值都比新标注宽松；新标注要连续放得下
+ *   一小段时间才显示，显隐再淡入淡出。否则镜头每动一点，互相压着的标注就轮流胜出，满屏闪烁。
  */
 
 interface PointLabel {
@@ -30,6 +32,8 @@ interface PointLabel {
 
 /** 道路上较直的一段 */
 interface Run {
+  /** 路名 + 段号，用来记住这一段上的标注 */
+  key: string;
   ax: number;
   ay: number;
   az: number;
@@ -91,6 +95,7 @@ function runsOf(d: District, pts: Float64Array): Run[] {
       const bx = pts[2 * i1] as number;
       const by = pts[2 * i1 + 1] as number;
       runs.push({
+        key: '',
         ax,
         ay,
         az: terrainAt(d.terrain, ax, ay) + 1,
@@ -213,7 +218,13 @@ function buildLabels(d: District): { points: PointLabel[]; roads: RoadLabel[] } 
       });
     }
   }
-  return { points, roads: [...byName.values()] };
+  const roads = [...byName.values()];
+  for (const r of roads) {
+    r.runs.forEach((run, i) => {
+      run.key = `${r.key}#${i}`;
+    });
+  }
+  return { points, roads };
 }
 
 const FONT = '"PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif';
@@ -226,6 +237,44 @@ interface Box {
 }
 
 const overlaps = (a: Box, b: Box) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+
+/** 品牌徽标的半径（像素） */
+const LOGO_R = 11;
+/** 已显示的标注，距离类阈值放宽的倍数：要大于一格滚轮的缩放（约 6%） */
+const HOLD_SLACK = 1.12;
+/** 已显示的标注碰撞框向内收、新标注向外放（像素），两者之差是显隐翻转的缓冲 */
+const HOLD_INSET = 4;
+const JOIN_OUTSET = 6;
+/** 淡入淡出的时长（秒）：只跳一两帧的显隐变化几乎看不出来 */
+const FADE_SECONDS = 0.16;
+/** 新标注要连续放得下这么久（秒）才显示：镜头转动时一闪而过的空隙不算 */
+const ADMIT_SECONDS = 0.2;
+
+interface PointMark {
+  kind: 'point';
+  label: PointLabel;
+}
+
+interface RoadMark {
+  kind: 'road';
+  label: RoadLabel;
+  run: Run;
+  angle: number;
+}
+
+type Mark = PointMark | RoadMark;
+
+/** 画着的标注：淡出时还要接着画，所以记着画什么 */
+interface Shown {
+  /** 上一次放置时放下了 */
+  on: boolean;
+  alpha: number;
+  /** 最近一次放下时的重画序号 */
+  stamp: number;
+  /** 开始连续放得下的时刻（秒） */
+  since: number;
+  mark: Mark;
+}
 
 export function Labels({ district }: { district: District }) {
   const { camera, gl, size, controls } = useThree();
@@ -256,7 +305,16 @@ export function Labels({ district }: { district: District }) {
     canvas.style.height = `${size.height}px`;
   }, [canvas, size]);
 
-  const last = useRef({ m: new Matrix4(), p: new Matrix4(), w: 0, night: -1 });
+  const last = useRef({
+    m: new Matrix4(),
+    p: new Matrix4(),
+    w: 0,
+    night: -1,
+    fading: false,
+    stamp: 0,
+    clock: 0,
+  });
+  const states = useRef(new Map<string, Shown>());
   // 品牌徽标图片：加载好后让标注层重画一次
   const logos = useMemo(() => {
     const map = new Map<string, HTMLImageElement>();
@@ -273,13 +331,14 @@ export function Labels({ district }: { district: District }) {
   const widths = useRef(new Map<string, number>());
   const v = useMemo(() => new Vector3(), []);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     camera.updateMatrixWorld();
     const night = sceneUniforms.uNight.value > 0.5 ? 1 : 0;
     const L = last.current;
     if (
+      !L.fading &&
       L.m.equals(camera.matrixWorld) &&
       L.p.equals(camera.projectionMatrix) &&
       L.w === canvas.width &&
@@ -291,6 +350,9 @@ export function Labels({ district }: { district: District }) {
     L.p.copy(camera.projectionMatrix);
     L.w = canvas.width;
     L.night = night;
+    L.stamp++;
+    const dt = Math.min(delta, 0.05);
+    L.clock += dt;
 
     const dpr = canvas.width / Math.max(1, size.width);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -309,10 +371,8 @@ export function Labels({ district }: { district: District }) {
     // 离镜头太远的（地平线附近）不标：透视把它们挤在一起，只会糊成一片
     const farLimit = dist * 2.1;
     const cam = camera.position;
-    const tooFar = (x: number, y: number, z: number) =>
-      Math.hypot(x - cam.x, z - cam.y, -y - cam.z) > farLimit;
-    const project = (x: number, y: number, z: number): [number, number] | null => {
-      if (tooFar(x, y, z)) return null;
+    const project = (x: number, y: number, z: number, slack = 1): [number, number] | null => {
+      if (Math.hypot(x - cam.x, z - cam.y, -y - cam.z) > farLimit * slack) return null;
       v.set(x, z, -y).project(camera);
       if (v.z > 1 || v.z < -1) return null;
       return [((v.x + 1) / 2) * size.width, ((1 - v.y) / 2) * size.height];
@@ -328,69 +388,148 @@ export function Labels({ district }: { district: District }) {
       return w;
     };
 
+    const state = states.current;
+    const wasOn = (key: string) => state.get(key)?.on === true;
+    const show = (key: string, mark: Mark) => {
+      const s = state.get(key);
+      if (s) {
+        s.stamp = L.stamp;
+        s.mark = mark;
+      } else {
+        state.set(key, { on: false, alpha: 0, stamp: L.stamp, since: L.clock, mark });
+      }
+    };
+
     const placed: Box[] = [];
-    const free = (b: Box) => !placed.some((p) => overlaps(p, b));
+    const free = (b: Box, on: boolean) => {
+      const m = on ? -HOLD_INSET : JOIN_OUTSET;
+      const grown = { x0: b.x0 - m, y0: b.y0 - m, x1: b.x1 + m, y1: b.y1 + m };
+      return !placed.some((p) => overlaps(p, grown));
+    };
     const ink = night ? '#e3eaf3' : '#3e5470';
     const inkStrong = night ? '#ffffff' : '#0f1e33';
     const halo = night ? 'rgba(14, 18, 28, 0.85)' : 'rgba(255, 255, 255, 0.92)';
     const roadInk = night ? '#bcc8d8' : '#66788f';
 
-    type Item = { priority: number; d: number; draw: () => void };
+    const logoOf = (p: PointLabel) => {
+      const img = p.logo ? logos.get(p.logo) : undefined;
+      return img?.complete && img.naturalWidth ? img : null;
+    };
+    const pointFont = (p: PointLabel) => {
+      const px = p.style === 'campus' ? 13 : p.style === 'station' ? 12 : 11;
+      const weight = p.style === 'campus' || p.style === 'station' ? 600 : 500;
+      return { px, font: `${weight} ${px}px ${FONT}` };
+    };
+    const pointBox = (p: PointLabel, s: [number, number]): Box => {
+      if (p.style === 'brand') {
+        return { x0: s[0] - LOGO_R, y0: s[1] - LOGO_R, x1: s[0] + LOGO_R, y1: s[1] + LOGO_R };
+      }
+      const { px, font } = pointFont(p);
+      const w = measure(p.text, font);
+      const pad = p.style === 'station' ? 5 : 2;
+      return {
+        x0: s[0] - w / 2 - pad,
+        y0: s[1] - px / 2 - pad,
+        x1: s[0] + w / 2 + pad,
+        y1: s[1] + px / 2 + pad,
+      };
+    };
+    const paintPoint = (p: PointLabel) => {
+      const s = project(p.x, p.y, p.z, Number.POSITIVE_INFINITY);
+      if (!s) return;
+      const box = pointBox(p, s);
+      if (p.style === 'brand') {
+        const img = logoOf(p);
+        if (!img) return;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetY = 1;
+        ctx.drawImage(img, box.x0, box.y0, 2 * LOGO_R, 2 * LOGO_R);
+        ctx.restore();
+        return;
+      }
+      ctx.font = pointFont(p).font;
+      if (p.style === 'station') {
+        ctx.fillStyle = night ? 'rgba(255,255,255,0.92)' : 'rgba(15,30,51,0.86)';
+        ctx.beginPath();
+        ctx.roundRect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0, 3);
+        ctx.fill();
+        ctx.fillStyle = night ? '#0f1e33' : '#ffffff';
+        ctx.fillText(p.text, s[0], s[1] + 0.5);
+        return;
+      }
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = halo;
+      ctx.strokeText(p.text, s[0], s[1]);
+      ctx.fillStyle = p.style === 'campus' ? inkStrong : ink;
+      ctx.fillText(p.text, s[0], s[1]);
+    };
+
+    const roadFont = (r: RoadLabel) => {
+      const px = r.cls <= 1 ? 12 : 11;
+      return { px, font: `${r.cls <= 2 ? 500 : 400} ${px}px ${FONT}` };
+    };
+    const runPose = (run: Run, prev: number | undefined, slack: number) => {
+      const a = project(run.ax, run.ay, run.az, slack);
+      const b = project(run.bx, run.by, run.bz, slack);
+      if (!a || !b) return null;
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      let angle = Math.atan2(dy, dx);
+      if (angle > Math.PI / 2) angle -= Math.PI;
+      if (angle < -Math.PI / 2) angle += Math.PI;
+      // 路接近竖直时角度会在 ±90° 间跳：已显示的沿用原朝向，转过头一些才翻面
+      if (prev !== undefined) {
+        const alt = angle > 0 ? angle - Math.PI : angle + Math.PI;
+        if (Math.abs(alt - prev) < Math.abs(angle - prev) && Math.abs(alt) < Math.PI / 2 + 0.3) {
+          angle = alt;
+        }
+      }
+      return { cx: (a[0] + b[0]) / 2, cy: (a[1] + b[1]) / 2, len: Math.hypot(dx, dy), angle };
+    };
+    const paintRoad = (mark: RoadMark) => {
+      const pose = runPose(mark.run, mark.angle, Number.POSITIVE_INFINITY);
+      if (!pose) return;
+      mark.angle = pose.angle;
+      ctx.save();
+      ctx.translate(pose.cx, pose.cy);
+      ctx.rotate(pose.angle);
+      ctx.font = roadFont(mark.label).font;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = halo;
+      ctx.strokeText(mark.label.text, 0, 0);
+      ctx.fillStyle = roadInk;
+      ctx.fillText(mark.label.text, 0, 0);
+      ctx.restore();
+    };
+
+    type Item = { priority: number; sticky: number; d: number; place: () => void };
     const items: Item[] = [];
 
     for (const p of labels.points) {
-      if (dist > p.maxDistance * (compact ? 0.75 : 1)) continue;
+      const on = wasOn(p.key);
+      const slack = on ? HOLD_SLACK : 1;
+      if (dist > p.maxDistance * (compact ? 0.75 : 1) * slack) continue;
       const d = Math.hypot(p.x - tx, p.y - ty);
-      if (d > radius) continue;
+      if (d > radius * slack) continue;
       items.push({
         priority: p.priority,
+        sticky: on ? 1 : 0,
         d,
-        draw: () => {
-          const s = project(p.x, p.y, p.z);
+        place: () => {
+          if (p.style === 'brand' && !logoOf(p)) return;
+          const s = project(p.x, p.y, p.z, slack);
           if (!s) return;
-          if (p.style === 'brand') {
-            const img = p.logo ? logos.get(p.logo) : undefined;
-            if (!img?.complete || !img.naturalWidth) return;
-            const r = 11;
-            const box = { x0: s[0] - r, y0: s[1] - r, x1: s[0] + r, y1: s[1] + r };
-            if (!free(box)) return;
-            placed.push(box);
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
-            ctx.shadowBlur = 3;
-            ctx.shadowOffsetY = 1;
-            ctx.drawImage(img, box.x0, box.y0, 2 * r, 2 * r);
-            ctx.restore();
+          // 屏幕外的不占位也不画；已显示的可以探出去一点
+          const edge = on ? -40 : 0;
+          if (s[0] < edge || s[1] < edge || s[0] > size.width - edge || s[1] > size.height - edge) {
             return;
           }
-          const size = p.style === 'campus' ? 13 : p.style === 'station' ? 12 : 11;
-          const weight = p.style === 'campus' || p.style === 'station' ? 600 : 500;
-          const font = `${weight} ${size}px ${FONT}`;
-          const w = measure(p.text, font);
-          const pad = p.style === 'station' ? 5 : 2;
-          const box = {
-            x0: s[0] - w / 2 - pad,
-            y0: s[1] - size / 2 - pad,
-            x1: s[0] + w / 2 + pad,
-            y1: s[1] + size / 2 + pad,
-          };
-          if (!free(box)) return;
+          const box = pointBox(p, s);
+          if (!free(box, on)) return;
           placed.push(box);
-          ctx.font = font;
-          if (p.style === 'station') {
-            ctx.fillStyle = night ? 'rgba(255,255,255,0.92)' : 'rgba(15,30,51,0.86)';
-            ctx.beginPath();
-            ctx.roundRect(box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0, 3);
-            ctx.fill();
-            ctx.fillStyle = night ? '#0f1e33' : '#ffffff';
-            ctx.fillText(p.text, s[0], s[1] + 0.5);
-            return;
-          }
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = halo;
-          ctx.strokeText(p.text, s[0], s[1]);
-          ctx.fillStyle = p.style === 'campus' ? inkStrong : ink;
-          ctx.fillText(p.text, s[0], s[1]);
+          show(p.key, { kind: 'point', label: p });
         },
       });
     }
@@ -398,64 +537,84 @@ export function Labels({ district }: { district: District }) {
     for (const r of labels.roads) {
       // 手机上不标支路，只留主干道
       if (compact && r.cls > 2) continue;
-      if (dist > r.maxDistance) continue;
       const near = r.runs
-        .map((run) => ({ run, d: Math.hypot(run.mx - tx, run.my - ty) }))
-        .filter((x) => x.d < radius)
-        .sort((a, b) => a.d - b.d);
-      if (!near.length) continue;
+        .map((run) => {
+          const on = wasOn(run.key);
+          return { run, on, d: Math.hypot(run.mx - tx, run.my - ty) };
+        })
+        .filter((x) => x.d < radius * (x.on ? HOLD_SLACK : 1))
+        .sort((a, b) => Number(b.on) - Number(a.on) || a.d - b.d);
+      const first = near[0];
+      if (!first) continue;
+      if (dist > r.maxDistance * (first.on ? HOLD_SLACK : 1)) continue;
       items.push({
         priority: r.priority,
-        d: near[0]?.d ?? 0,
-        draw: () => {
-          const fontSize = r.cls <= 1 ? 12 : 11;
-          const font = `${r.cls <= 2 ? 500 : 400} ${fontSize}px ${FONT}`;
+        sticky: first.on ? 1 : 0,
+        d: first.d,
+        place: () => {
+          const { px, font } = roadFont(r);
           const w = measure(r.text, font);
           const mine: [number, number][] = [];
-          for (const { run } of near) {
+          for (const { run, on } of near) {
             if (mine.length >= 4) break;
-            const a = project(run.ax, run.ay, run.az);
-            const b = project(run.bx, run.by, run.bz);
-            if (!a || !b) continue;
-            const dx = b[0] - a[0];
-            const dy = b[1] - a[1];
-            const len = Math.hypot(dx, dy);
-            if (len < w + 24) continue;
-            const cx = (a[0] + b[0]) / 2;
-            const cy = (a[1] + b[1]) / 2;
-            if (cx < 0 || cy < 0 || cx > size.width || cy > size.height) continue;
-            if (mine.some(([x, y]) => Math.hypot(x - cx, y - cy) < 320)) continue;
-            let angle = Math.atan2(dy, dx);
-            if (angle > Math.PI / 2) angle -= Math.PI;
-            if (angle < -Math.PI / 2) angle += Math.PI;
+            const prev = state.get(run.key)?.mark;
+            const pose = runPose(
+              run,
+              prev?.kind === 'road' ? prev.angle : undefined,
+              on ? HOLD_SLACK : 1,
+            );
+            if (!pose) continue;
+            const { cx, cy, angle, len } = pose;
+            if (len < w + (on ? 12 : 30)) continue;
+            // 已显示的可以探出屏幕一点，新标注要完全在屏内
+            const edge = on ? -30 : 10;
+            if (cx < edge || cy < edge || cx > size.width - edge || cy > size.height - edge) {
+              continue;
+            }
+            const spacing = on ? 280 : 340;
+            if (mine.some(([x, y]) => Math.hypot(x - cx, y - cy) < spacing)) continue;
             const hw = w / 2 + 3;
-            const hh = fontSize / 2 + 2;
+            const hh = px / 2 + 2;
             const c = Math.abs(Math.cos(angle));
             const sn = Math.abs(Math.sin(angle));
             const ex = hw * c + hh * sn;
             const ey = hw * sn + hh * c;
             const box = { x0: cx - ex, y0: cy - ey, x1: cx + ex, y1: cy + ey };
-            if (!free(box)) continue;
+            if (!free(box, on)) continue;
             placed.push(box);
             mine.push([cx, cy]);
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(angle);
-            ctx.font = font;
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = halo;
-            ctx.strokeText(r.text, 0, 0);
-            ctx.fillStyle = roadInk;
-            ctx.fillText(r.text, 0, 0);
-            ctx.restore();
+            show(run.key, { kind: 'road', label: r, run, angle });
           }
         },
       });
     }
 
-    items.sort((a, b) => b.priority - a.priority || a.d - b.d);
+    items.sort((a, b) => b.priority - a.priority || b.sticky - a.sticky || a.d - b.d);
     const limit = compact ? 16 : items.length;
-    for (const it of items.slice(0, limit)) it.draw();
+    for (const it of items.slice(0, limit)) it.place();
+
+    // 还在等准入的先占着位置不画；这一拍没放下的接着淡出，淡完才从记录里删掉
+    const step = dt / FADE_SECONDS;
+    let fading = false;
+    for (const [key, s] of state) {
+      const fits = s.stamp === L.stamp;
+      if (fits && s.alpha === 0 && L.clock - s.since < ADMIT_SECONDS) {
+        fading = true;
+        continue;
+      }
+      s.on = fits;
+      s.alpha = fits ? Math.min(1, s.alpha + step) : Math.max(0, s.alpha - step);
+      if (!fits && s.alpha === 0) {
+        state.delete(key);
+        continue;
+      }
+      if (s.alpha < 1) fading = true;
+      ctx.globalAlpha = s.alpha;
+      if (s.mark.kind === 'point') paintPoint(s.mark.label);
+      else paintRoad(s.mark);
+    }
+    ctx.globalAlpha = 1;
+    L.fading = fading;
   });
 
   return null;
